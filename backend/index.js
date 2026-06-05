@@ -4,6 +4,7 @@ import userRouter from "./routes/userRouter.js"
 import jwt from "jsonwebtoken"
 import cors from "cors"
 import dotenv from "dotenv"
+import sessionRouter from "./routes/sessionRouter.js"
 
 dotenv.config()
 
@@ -64,6 +65,7 @@ app.use(
     })
 
 app.use("/api/users",userRouter)
+app.use("/api/sessions",sessionRouter)
 
 
 app.listen(5000,
