@@ -5,13 +5,18 @@ import jwt from "jsonwebtoken"
 import cors from "cors"
 import dotenv from "dotenv"
 import sessionRouter from "./routes/sessionRouter.js"
+import dns from "dns"
+
 
 dotenv.config()
+dns.setServers(["1.1.1.1","8.8.8.8"])
+
+
 
 const mongoURI = process.env.MONGO_URL
 
 mongoose.connect(mongoURI).then(
-    ()=>{
+    () => {
         console.log("Connected to mongodb cluster")
     }
 )
@@ -23,53 +28,53 @@ app.use(cors())
 app.use(express.json())
 
 app.use(
-    (req,res,next)=>{
+    (req, res, next) => {
 
         const AuthorizationHeader = req.header("Authorization")
 
-       if(AuthorizationHeader!=null){
+        if (AuthorizationHeader != null) {
 
-        const token = AuthorizationHeader.replace("Bearer ","")
+            const token = AuthorizationHeader.replace("Bearer ", "")
 
-        //console.log(token)
+            //console.log(token)
 
-        jwt.verify(token,process.env.JWT_SECRET,
-            (error,content)=>{
+            jwt.verify(token, process.env.JWT_SECRET,
+                (error, content) => {
 
-                if(content == null){
-                    console.log("invalid token")
+                    if (content == null) {
+                        console.log("invalid token")
 
-                    res.status(401).json({
-                        message : "Invalid token"
-                    })
-                    
+                        res.status(401).json({
+                            message: "Invalid token"
+                        })
 
-                }else{
-                    console.log(content)
-                    req.user = content
-                    next()
+
+                    } else {
+                        console.log(content)
+                        req.user = content
+                        next()
+                    }
+
+
                 }
+            )
 
-                
-            }
-        )
-
-       }else{
+        } else {
 
 
             next()
 
-       }
+        }
 
-        
+
     })
 
-app.use("/api/users",userRouter)
-app.use("/api/sessions",sessionRouter)
+app.use("/api/users", userRouter)
+app.use("/api/sessions", sessionRouter)
 
 
 app.listen(5000,
-    ()=>{
+    () => {
         console.log("server is running")
     }
 )

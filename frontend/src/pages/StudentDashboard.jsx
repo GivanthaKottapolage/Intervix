@@ -55,6 +55,15 @@ export default function StudentDashboard() {
                                     {new Date(session.createdAt).toLocaleDateString()}
                                 </p>
                                 <p className="mt-3">
+                                    <span className="capitalize px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                                        {session.jobRole}
+                                    </span>
+                                </p>
+                                <p className="mt-2 text-gray-600">{session.preferedIndustry}</p>
+                                <p className="mt-2 text-gray-600">{session.university}</p>
+                                <p className="mt-2 text-gray-600">{session.academicYear}</p>
+                                <p className="mt-2 text-gray-600">{session.experienceLevel}</p>
+                                <p className="mt-3">
                                     <span className="capitalize px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
                                         {session.status}
                                     </span>

@@ -13,7 +13,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ 
+const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
         if (file.mimetype === "application/pdf") {
@@ -37,6 +37,12 @@ export function createSession(req, res) {
         userEmail: user.email,
         fullName: req.body.fullName || user.fullName,
         cvFilePath: req.file.path,     // ← This comes from multer
+        jobRole: req.body.jobRole,
+        preferedIndustry: req.body.preferedIndustry,
+        university: req.body.university,
+        academicYear: req.body.academicYear,
+        experienceLevel: req.body.experienceLevel,
+        areasToFocus: JSON.parse(req.body.areasToFocus || "[]")
     });
 
     session.save()
