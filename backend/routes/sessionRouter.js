@@ -1,9 +1,9 @@
-import express from "express";
-import { createSession, getMySessions, upload } from "../controllers/sessionController.js";
+const express = require('express');
+const { createSession, getMySessions, upload } = require('../controllers/sessionController');
 
 const sessionRouter = express.Router();
 
-sessionRouter.post("/", upload.single("cv"), createSession);   // ← Important: multer middleware
-sessionRouter.get("/my", getMySessions);
+sessionRouter.post('/', upload.single('cv'), createSession);
+sessionRouter.get('/my', getMySessions);
 
-export default sessionRouter;
+module.exports = sessionRouter;
