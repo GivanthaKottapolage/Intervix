@@ -37,7 +37,7 @@ const withGeminiRetry = async (fn, purpose = 'gemini') => {
                 lastError = err;
                 if (!isRetryable(err)) throw err;
 
-                const delayMs = 2000 * (attempt + 1);
+                conhttps://github.com/GivanthaKottapolage/Intervix/pull/14/conflict?name=backend%252Fservices%252FgeminiClient.js&base_oid=9505f52d39896c5aa0505179872b17f6cc5bc0dc&head_oid=48952d00e05c41871a98235e875c91dc1d43cbd5st delayMs = 2000 * (attempt + 1);
                 console.warn(`[Gemini] Rate limit on ${modelName}, retry in ${delayMs}ms`);
                 await sleep(delayMs);
             }
