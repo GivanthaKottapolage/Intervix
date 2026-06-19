@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose'); // ← changed from import
 
 const sessionSchema = new mongoose.Schema({
     userEmail: {
@@ -13,16 +13,67 @@ const sessionSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    jobRole: {
+        type: String,
+        required: true
+    },
+    preferedIndustry: {
+        type: String,
+        required: true
+    },
+    university: {
+        type: String,
+        required: true
+    },
+    academicYear: {
+        type: String,
+        required: true
+    },
+    experienceLevel: {
+        type: String,
+        required: true
+    },
+    areasToFocus: {
+        type: [String],
+        default: []
+    },
     status: {
         type: String,
-        default: "pending", // pending, in-progress, completed
-        enum: ["pending", "in-progress", "completed"]
+        default: 'pending',
+        enum: ['pending', 'in-progress', 'completed']
     },
+
+    // ── YOUR NEW FIELDS ──────────────────────
+    cvData: {
+        type: Object,    // structured JSON from Gemini
+        default: null
+    },
+    cvFileName: {
+        type: String,
+        default: null
+    },
+    messages: [{      // stores full interview transcript
+        role: {
+            type: String,
+            enum: ['interviewer', 'candidate']
+        },
+        text: String,
+        timestamp: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    report: {         // stores feedback report
+        type: Object,
+        default: null
+    },
+    // ─────────────────────────────────────────
+
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
 
-const Session = mongoose.model("Session", sessionSchema);
-export default Session;
+const Session = mongoose.model('Session', sessionSchema);
+module.exports = Session; // ← changed from export default
