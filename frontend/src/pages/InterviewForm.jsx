@@ -12,6 +12,7 @@ export default function InterviewForm() {
     const [academicYear, setAcademicYear] = useState("");
     const [experienceLevel, setExperienceLevel] = useState("");
     const [areasToFocus, setAreasToFocus] = useState([]);
+    const [questionCount, setQuestionCount] = useState(5);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
@@ -35,6 +36,7 @@ export default function InterviewForm() {
         formData.append("academicYear", academicYear);
         formData.append("experienceLevel", experienceLevel);
         formData.append("areasToFocus", JSON.stringify(areasToFocus));
+        formData.append("questionCount", String(questionCount));
         try {
             await axios.post(
                 "/api/sessions/",
@@ -42,16 +44,19 @@ export default function InterviewForm() {
                 {
                     headers: {
                         Authorization: "Bearer " + token,
-                        "Content-Type": "multipart/form-data",
                     },
                 }
             );
 
             toast.success("CV uploaded successfully! Session created.");
-            navigate("/dashboard");   // Go back to dashboard after success
+            navigate("/dashboard");
         } catch (err) {
-            toast.error("Failed to upload CV. Please try again.");
-            console.log(err);
+            const message =
+                err.response?.data?.message ||
+                err.response?.data?.error ||
+                "Failed to upload CV. Please try again.";
+            toast.error(message);
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -161,6 +166,18 @@ export default function InterviewForm() {
                             className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter areas you want to focus on (comma separated)"
                             required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Number of Interview Questions</label>
+                        <input
+                            type="number"
+                            min={3}
+                            max={15}
+                            value={questionCount}
+                            onChange={(e) => setQuestionCount(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 

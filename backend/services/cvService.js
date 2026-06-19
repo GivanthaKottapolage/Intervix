@@ -6,7 +6,11 @@ const extractCVText = async (filePath) => {
   try {
     const fileBuffer = fs.readFileSync(filePath);
     const data = await pdfParse(fileBuffer);
-    const rawText = data.text.replace(/\s+/g, ' ').trim();
+    const rawText = data?.text?.replace(/\s+/g, ' ').trim() || '';
+
+    if (!rawText) {
+      throw new Error('The uploaded PDF does not contain readable text. Please upload a valid text-based PDF.');
+    }
 
     console.log('📄 Raw text extracted, characters:', rawText.length);
 
@@ -52,8 +56,19 @@ const extractCVText = async (filePath) => {
     return cvData;
 
   } catch (err) {
-    console.error('❌ CV extraction error:', err.message);
-    throw err;
+    const message = err?.message || 'Unknown PDF parsing error';
+    console.error('❌ CV extraction error:', message);
+
+    if (
+      message.includes('Invalid PDF') ||
+      message.includes('bad XRef') ||
+      message.includes('root reference') ||
+      message.includes('readable text')
+    ) {
+      throw new Error('Unable to read the PDF. Please upload a valid PDF with readable text.');
+    }
+
+    throw new Error(message);
   }
 };
 

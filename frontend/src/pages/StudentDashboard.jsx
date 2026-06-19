@@ -68,6 +68,23 @@ export default function StudentDashboard() {
                                         {session.status}
                                     </span>
                                 </p>
+
+                                {session.questions?.length > 0 && (
+                                    <p className="mt-2 text-sm text-gray-500">
+                                        {session.questions.length} questions ready
+                                    </p>
+                                )}
+
+                                <Link
+                                    to={`/interview/${session._id}`}
+                                    className="mt-4 inline-block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-2xl"
+                                >
+                                    {session.status === "completed"
+                                        ? "View Results"
+                                        : session.questions?.length > 0
+                                            ? "Start Interview"
+                                            : "Prepare Interview"}
+                                </Link>
                             </div>
                         ))}
                     </div>

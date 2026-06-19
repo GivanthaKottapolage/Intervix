@@ -1,31 +1,54 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+/**
+ * Feature 3 — Google TTS via gTTS-style free API (no API key).
+ * Uses google-tts-api to fetch MP3 from Google Translate TTS.
+ */
+const googleTTS = require('google-tts-api');
+const axios = require('axios');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const convertToSpeech = async (text, lang = 'en') => {
+    if (!text || !text.trim()) {
+        throw new Error('TTS text cannot be empty');
+    }
 
-const convertToSpeech = async (text) => {
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash-preview-tts'
+    console.log('[TTS] Converting to speech:', text.slice(0, 80) + (text.length > 80 ? '...' : ''));
+
+    const urls = googleTTS.getAllAudioUrls(text, {
+        lang,
+        slow: false,
+        host: 'https://translate.google.com'
     });
 
-    const result = await model.generateContent({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: {
-                        voiceName: 'Charon' // deep professional voice
-                    }
-                }
-            }
+    const buffers = [];
+
+    for (const chunk of urls) {
+        const audioUrl = typeof chunk === 'string' ? chunk : chunk?.url;
+
+        if (!audioUrl) {
+            continue;
         }
-    });
 
-    const audioData = result.response.candidates[0]
-        .content.parts[0].inlineData.data;
+        const response = await axios.get(audioUrl, {
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
 
-    // returns base64 audio — convert to buffer
-    return Buffer.from(audioData, 'base64');
+        if (!response.data || response.data.length === 0) {
+            throw new Error('TTS service returned no audio data');
+        }
+
+        buffers.push(Buffer.from(response.data));
+    }
+
+    if (buffers.length === 0) {
+        throw new Error('No audio URLs were generated for the provided text');
+    }
+
+    const audioBuffer = Buffer.concat(buffers);
+    console.log('[TTS] Audio generated, bytes:', audioBuffer.length);
+    return audioBuffer;
 };
 
 module.exports = { convertToSpeech };

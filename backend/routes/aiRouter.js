@@ -1,32 +1,39 @@
 const express = require('express');
-const router = express.Router();
-const aiController = require('../controllers/aiController');
-const { uploadCV } = require('../controllers/cvController');
 const multer = require('multer');
+const fs = require('fs');
+const interviewController = require('../controllers/interviewController');
+const { uploadCV } = require('../controllers/cvController');
 
-// multer for audio files
+const router = express.Router();
+
+const audioDir = 'uploads/audio/';
+if (!fs.existsSync(audioDir)) {
+    fs.mkdirSync(audioDir, { recursive: true });
+}
+
 const audioUpload = multer({
-    dest: 'uploads/audio/',
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+    dest: audioDir,
+    limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// multer for CV files
 const cvUpload = multer({
     dest: 'uploads/cvs/',
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'application/pdf') {
-            cb(null, true);
-        } else {
-            cb(new Error('Only PDF files allowed'));
-        }
+        if (file.mimetype === 'application/pdf') cb(null, true);
+        else cb(new Error('Only PDF files allowed'));
     }
 });
 
-// ── AI routes ──────────────────────────────────────────
-router.post('/ai/start-interview', aiController.startInterview);                        // ← new
-router.post('/ai/process-answer', audioUpload.single('audio'), aiController.processAnswer);
-router.post('/ai/generate-report', aiController.generateReport);
+// Interview pipeline
+router.post('/ai/prepare', interviewController.prepareInterview);
+router.post('/ai/start', interviewController.startInterview);
+router.post('/ai/tts', interviewController.speakQuestion);
+router.post('/ai/submit-answer', audioUpload.single('audio'), interviewController.submitAnswer);
+router.get('/ai/session/:sessionId', interviewController.getInterviewSession);
+router.post('/ai/generate-report', interviewController.generateReport);
+
+// CV upload (existing)
 router.post('/cv/upload', cvUpload.single('cv'), uploadCV);
 
 module.exports = router;

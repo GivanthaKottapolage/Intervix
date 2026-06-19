@@ -1,11 +1,12 @@
-import express from "express"
-import mongoose from "mongoose"
-import userRouter from "./routes/userRouter.js"
-import jwt from "jsonwebtoken"
-import cors from "cors"
-import dotenv from "dotenv"
-import sessionRouter from "./routes/sessionRouter.js"
-import dns from "dns"
+const express = require("express")
+const mongoose = require("mongoose")
+const userRouter = require("./routes/userRouter.js")
+const jwt = require("jsonwebtoken")
+const cors = require("cors")
+const dotenv = require("dotenv")
+const sessionRouter = require("./routes/sessionRouter.js")
+const aiRouter = require("./routes/aiRouter.js")
+const dns = require("dns")
 
 
 dotenv.config()
@@ -34,7 +35,7 @@ app.use((req, res, next) => {
         jwt.verify(token, process.env.JWT_SECRET, (error, content) => {
             if (content == null) {
                 console.log('invalid token');
-                res.status(401).json({ message: 'Invalid token' });
+                return res.status(401).json({ message: 'Invalid token' });
             } else {
                 console.log(content);
                 req.user = content;
@@ -48,6 +49,7 @@ app.use((req, res, next) => {
 
 app.use("/api/users", userRouter)
 app.use("/api/sessions", sessionRouter)
+app.use("/api", aiRouter)
 
 
 app.listen(5000, () => {
