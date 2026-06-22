@@ -6,13 +6,8 @@ const { uploadCV } = require('../controllers/cvController');
 
 const router = express.Router();
 
-const audioDir = 'uploads/audio/';
-if (!fs.existsSync(audioDir)) {
-    fs.mkdirSync(audioDir, { recursive: true });
-}
-
 const audioUpload = multer({
-    dest: audioDir,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }
 });
 
