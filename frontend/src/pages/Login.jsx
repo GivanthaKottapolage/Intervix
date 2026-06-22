@@ -14,8 +14,13 @@ function Login() {
     try {
       const res = await axios.post('/api/users/login', { email, password })
       localStorage.setItem('token', res.data.token)
+      localStorage.setItem('role', res.data.role)
       alert('Login successful!')
-      navigate('/dashboard')
+      if (res.data.role === 'admin') {
+        navigate('/admin-dashboard')
+      } else {
+        navigate('/dashboard')
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed')
     }
