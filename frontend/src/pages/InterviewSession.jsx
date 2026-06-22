@@ -343,6 +343,12 @@ export default function InterviewSession() {
                         <div className="text-center space-y-4">
                             <p className="text-green-700 font-semibold text-lg">Interview completed!</p>
                             <p className="text-gray-600">All answers and feedback saved to your session.</p>
+                            <button
+                                onClick={() => navigate(`/report/${id}`)}
+                                className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-semibold transition cursor-pointer"
+                            >
+                                📊 View Performance Report
+                            </button>
                         </div>
                     )}
                 </div>

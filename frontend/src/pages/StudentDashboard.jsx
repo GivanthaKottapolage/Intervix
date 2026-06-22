@@ -28,12 +28,26 @@ export default function StudentDashboard() {
         }
     }
 
+    const handleLogout = () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        navigate("/login");
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-5xl mx-auto">
-                <h1 className="text-4xl font-bold text-gray-800 mb-8">
-                    Welcome to Intervix AI
-                </h1>
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-4xl font-bold text-gray-800">
+                        Welcome to Intervix AI
+                    </h1>
+                    <button
+                        onClick={handleLogout}
+                        className="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-all duration-200 shadow-md shadow-rose-600/10 hover:shadow-rose-600/20 active:scale-95 cursor-pointer"
+                    >
+                        Sign Out
+                    </button>
+                </div>
 
                 <Link
                     to="/interview-form"
@@ -76,7 +90,7 @@ export default function StudentDashboard() {
                                 )}
 
                                 <Link
-                                    to={`/interview/${session._id}`}
+                                    to={session.status === "completed" ? `/report/${session._id}` : `/interview/${session._id}`}
                                     className="mt-4 inline-block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-2xl"
                                 >
                                     {session.status === "completed"
