@@ -176,7 +176,8 @@ const submitAnswer = async (req, res) => {
         }
 
         const { answerText, evaluation } = await processUserAnswer(
-            audioFile.path,
+            audioFile.buffer,
+            audioFile.mimetype || 'audio/webm',
             questionObj.question,
             session.cvData
         );
