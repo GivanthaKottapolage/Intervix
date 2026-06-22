@@ -1,10 +1,28 @@
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
+const axios = require('axios');
 const { withGeminiRetry } = require('./geminiClient');
 
-const extractCVText = async (filePath) => {
+const extractCVText = async (filePathOrUrl) => {
   try {
-    const fileBuffer = fs.readFileSync(filePath);
+    let fileBuffer;
+
+    if (filePathOrUrl.startsWith('http')) {
+      console.log('[cvService] Downloading from:', filePathOrUrl);
+      const response = await axios.get(filePathOrUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': '*/*'
+        }
+      });
+      fileBuffer = Buffer.from(response.data);
+      console.log('[cvService] Downloaded bytes:', fileBuffer.length);
+    } else {
+      fileBuffer = fs.readFileSync(filePathOrUrl);
+    }
+
     const data = await pdfParse(fileBuffer);
     const rawText = data?.text?.replace(/\s+/g, ' ').trim() || '';
 
