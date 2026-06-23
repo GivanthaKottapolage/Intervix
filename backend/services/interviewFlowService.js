@@ -8,7 +8,7 @@ const { transcribeAudio } = require('./whisperService');
 const { evaluateAnswer } = require('./geminiService');
 
 const prepareSession = async (session, questionCount) => {
-    const count = questionCount || session.questionCount || DEFAULT_COUNT;
+    const count = Math.max(questionCount || session.questionCount || DEFAULT_COUNT, 15);
 
     let cvData = session.cvData;
     if (!cvData && session.cvFilePath) {

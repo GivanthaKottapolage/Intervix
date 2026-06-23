@@ -32,7 +32,7 @@ const createSession = (req, res) => {
         return res.status(400).json({ message: 'Please upload a PDF file.' });
     }
 
-    const questionCount = parseInt(req.body.questionCount, 10) || DEFAULT_COUNT;
+        const questionCount = Math.max(parseInt(req.body.questionCount, 10) || DEFAULT_COUNT, 15);
 
     const session = new Session({
         userEmail: user.email,

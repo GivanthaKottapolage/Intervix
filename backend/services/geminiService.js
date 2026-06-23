@@ -1,17 +1,50 @@
 const { withGeminiRetry } = require('./geminiClient');
 
-const DEFAULT_COUNT = parseInt(process.env.DEFAULT_QUESTION_COUNT || '5', 10);
+const DEFAULT_COUNT = parseInt(process.env.DEFAULT_QUESTION_COUNT || '15', 10);
 
 const parseJsonFromGemini = (text) => {
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
+    if (!text || typeof text !== 'string') throw new Error('No text to parse');
+
+    // Try raw parse first (some responses are already pure JSON)
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        // Fall back to cleaning common fencing and try again
+        const cleaned = text.replace(/```json|```/g, '').trim();
+        try {
+            return JSON.parse(cleaned);
+        } catch (e2) {
+            // As a last resort, try to extract the first JSON array/object substring
+            const m = cleaned.match(/(\[\s*\{[\s\S]*\}\s*\])|(\{[\s\S]*\})/);
+            if (m && m[0]) {
+                return JSON.parse(m[0]);
+            }
+            // Give a helpful error including a short preview
+            const preview = cleaned.slice(0, 500);
+            throw new Error(`Failed to parse JSON from Gemini response. Preview: ${preview}`);
+        }
+    }
 };
 
 /**
  * Feature 1 — Generate all interview questions in ONE Gemini call.
  */
 const generateInterviewQuestions = async (cvData, sessionMeta = {}, questionCount = DEFAULT_COUNT) => {
-    const count = Math.min(Math.max(parseInt(questionCount, 10) || DEFAULT_COUNT, 3), 15);
+    const count = Math.max(parseInt(questionCount, 10) || DEFAULT_COUNT, 15);
+
+    // Normalize experience level inputs from frontend or callers
+    const rawLevel = String(sessionMeta.experienceLevel || 'mid').toLowerCase().trim();
+    const normalizeLevel = (s) => {
+        if (!s) return 'mid';
+        if (s.includes('intern')) return 'intern';
+        if (s.includes('entry')) return 'entry';
+        if (s.includes('junior')) return 'junior';
+        if (s.includes('mid')) return 'mid';
+        if (s.includes('senior')) return 'senior';
+        if (s.includes('lead')) return 'lead';
+        return 'mid';
+    };
+    const experienceLevel = normalizeLevel(rawLevel);
 
     const compactCv = {
         name: cvData?.name,
@@ -24,51 +57,150 @@ const generateInterviewQuestions = async (cvData, sessionMeta = {}, questionCoun
 
     const cvString = JSON.stringify(compactCv);
 
-    const prompt = `Generate exactly ${count} interview questions for a ${sessionMeta.jobRole || 'Software Engineer'} candidate.
+    // Tailor prompt based on experience level (intern, junior, mid, senior)
+    // let levelInstructions = '';
+    // if (experienceLevel === 'intern' || experienceLevel === 'junior') {
+    //     levelInstructions = 'Focus on fundamentals, practical examples, and basic problem-solving. Keep difficulty easy-to-medium and prefer hands-on, concrete questions.';
+    // } else if (experienceLevel === 'senior' || experienceLevel === 'lead') {
+    //     levelInstructions = 'Include advanced topics such as system design, scalability, architecture trade-offs, performance, and leadership/mentorship questions. Increase difficulty to medium-to-hard.';
+    // } else {
+    //     levelInstructions = 'Mix fundamentals with intermediate system design and practical problem solving. Keep difficulty medium.';
+    // }
+    let levelInstructions = '';
+    if (experienceLevel === 'intern') {
+        levelInstructions = `
+        Focus heavily on basics and understanding.
+        Topics: OOP basics, simple arrays/strings, very basic SQL, simple logic problems.
+        Difficulty: easy.
+        Keep questions very simple and beginner friendly.
+        `;
+    } 
+    else if (experienceLevel === 'entry') {
+        levelInstructions = `
+        Focus on job-ready fundamentals.
+        Topics: OOP concepts with examples, basic DSA, CRUD operations, SQL joins basics, simple APIs.
+        Difficulty: easy-to-medium.
+        `;
+    } 
+    else if (experienceLevel === 'junior') {
+        levelInstructions = `
+        Focus on practical coding and real-world usage.
+        Topics: OOP with real project examples, medium DSA, SQL queries, REST API basics, debugging questions.
+        Difficulty: medium.
+        `;
+    } 
+    else if (experienceLevel === 'mid') {
+        levelInstructions = `
+        Focus on real-world problem solving and system understanding.
+        Topics: Advanced OOP usage, DSA patterns, SQL optimization, REST APIs, caching basics, system design fundamentals.
+        Difficulty: medium.
+    `;
+    } 
+    else if (experienceLevel === 'senior') {
+        levelInstructions = `
+        Focus on system design and architecture thinking.
+        Topics: scalability, microservices, distributed systems, performance optimization, design trade-offs, leadership experience.
+        Difficulty: medium-to-hard.
+        `;
+    } 
+    else if (experienceLevel === 'lead') {
+        levelInstructions = `
+        Focus on architecture + leadership + strategic decisions.
+        Topics: large-scale system design, team leadership, reliability engineering, cloud architecture, high-level trade-offs.
+        Difficulty: hard.
+        `;
+    } 
+    else {
+        levelInstructions = `
+        Mix fundamentals with system design and practical problem solving.
+        Difficulty: medium.
+        `;
+    }
+
+    const prompt = `Generate exactly ${count} interview questions for a ${sessionMeta.jobRole || 'Software Engineer'} candidate at the ${experienceLevel} level. ${levelInstructions}
 
 Candidate CV:
 ${cvString}
 
-You MUST follow this exact question order based on the number requested:
+IMPORTANT:
+Candidate Experience Level: ${normalizedLevel}
 
-Question 1: Introduction
-- "Please introduce yourself and tell me about your background."
+The interview structure, question complexity, and topics MUST adapt to the candidate's experience level.
 
-Questions 2-3: OOP Concepts
-- Cover Encapsulation, Inheritance, Polymorphism, Abstraction
-- Ask for real examples from their projects
-- Example: "Can you explain polymorphism and give me an example from your own code?"
+Do NOT ask senior-level architecture questions to interns.
+Do NOT ask beginner-level questions to senior candidates.
 
-Questions 4-5: Data Structures & Algorithms (DSA)
-- Cover Arrays, LinkedLists, Stacks, Queues, Trees, Sorting algorithms
-- Example: "What is the difference between a stack and a queue? When would you use each?"
+INTERVIEW STRUCTURE:
 
-Questions 6-7: CRUD & SQL
-- Cover Database operations, SQL queries, joins, indexes
-- Example: "Can you write a SQL query to find all users who have placed more than 3 orders?"
+FOR INTERN:
+1. Introduction
+2-4. OOP Fundamentals
+5-7. Basic DSA (Arrays, Strings, Stack, Queue basics)
+8-9. Basic SQL & CRUD
+10-11. CV Projects
+12-13. Git, IDEs and Development Tools
+14+. Learning, Problem Solving and Career Goals
 
-Questions 8-9: System Architecture
-- Cover Client-server model, REST APIs, MVC pattern, microservices basics
-- Example: "Can you explain how a REST API works and what makes it RESTful?"
+FOR ENTRY LEVEL:
+1. Introduction
+2-3. OOP Concepts
+4-5. DSA Fundamentals
+6-7. CRUD & SQL
+8-9. REST APIs and MVC
+10-11. CV Projects
+12-13. Tools & Workflow
+14+. Challenges & Learning
 
-Questions 10-11: CV-Specific Projects
-- Reference their actual projects by name from the CV above
-- Example: "I see you built X — what was the biggest technical challenge you faced?"
-- Ask about tools they used and why
+FOR JUNIOR:
+1. Introduction
+2-3. OOP with real examples
+4-5. DSA and Problem Solving
+6-7. SQL Queries and CRUD
+8-9. REST APIs, MVC and Debugging
+10-11. CV Projects
+12-13. Git, Testing and Deployment
+14+. Technical Challenges & Learning
 
-Questions 12-13: Tools & Workflow
-- Cover Version control (Git), IDEs, testing, deployment
-- Example: "What tools do you use in your development workflow and why?"
+FOR MID:
+1. Introduction
+2-3. Advanced OOP and Design Principles
+4-5. DSA Optimization
+6-7. Database Design and SQL Optimization
+8-9. System Design Fundamentals
+10-11. CV Projects
+12-13. Testing, CI/CD and Deployment
+14+. Real-world Challenges & Learning
 
-Questions 14+: Challenges & Learning
-- "What was the hardest bug you ever fixed and how did you solve it?"
-- "What are you currently learning to improve your skills?"
+FOR SENIOR:
+1. Introduction
+2-3. Design Patterns and Advanced OOP
+4-5. Algorithm Trade-offs
+6-7. Database Scaling and Optimization
+8-11. System Design, Scalability, Microservices, Caching, CAP Theorem
+12-13. Leadership, Mentoring and Architecture Decisions
+14+. Technical Challenges, Innovation and Future Vision
+
+FOR LEAD:
+1. Introduction
+2-3. Software Architecture Principles
+4-5. Large-scale System Design
+6-7. Data Architecture and Reliability
+8-11. Distributed Systems, Scalability, Performance and Trade-offs
+12-13. Leadership, Team Management and Strategic Decisions
+14+. Organizational Challenges and Technical Vision
 
 IMPORTANT RULES:
-- Only generate the number of questions requested (${count})
-- Follow the order above strictly
+- Only generate exactly ${count} questions
+- Follow the structure for the candidate's experience level
 - For questions 10-11, reference ACTUAL project names from the CV
 - Each question must be unique
+- Difficulty must match the experience level
+- Intern = easy
+- Entry = easy-medium
+- Junior = medium
+- Mid = medium-medium+
+- Senior = hard
+- Lead = hard+
 - Be professional but friendly
 
 Return ONLY a valid JSON array (no markdown, no extra text):
@@ -138,7 +270,26 @@ Score 0-10. "correct" is true if score >= 6.`;
  * Called during interview — generates the next question dynamically
  * using the conversation transcript and CV.
  */
-const getInterviewerResponse = async (transcript, role, questionCount, cvText) => {
+const getInterviewerResponse = async (
+    transcript,
+    role,
+    questionCount,
+    cvText,
+    experienceLevel = 'mid'
+) => {
+    const rawLevel = String(experienceLevel || 'mid').toLowerCase().trim();
+    const normalizeLevel = (s) => {
+        if (!s) return 'mid';
+        if (s.includes('intern')) return 'intern';
+        if (s.includes('entry')) return 'entry';
+        if (s.includes('junior')) return 'junior';
+        if (s.includes('mid')) return 'mid';
+        if (s.includes('senior')) return 'senior';
+        if (s.includes('lead')) return 'lead';
+        return 'mid';
+    };
+    const normalizedLevel = normalizeLevel(rawLevel);
+
     const systemPrompt = `You are a professional interviewer for a ${role} position.
 
 Here is the candidate's CV:
@@ -148,45 +299,90 @@ ${cvText || 'No CV provided'}
 
 Follow this exact interview structure based on the question number:
 
-Question 1: Always start with "Please introduce yourself and tell me about your background."
+IMPORTANT:
+Candidate Experience Level: ${normalizedLevel}
 
-Questions 2-3: Ask about OOP concepts
-- Encapsulation, Inheritance, Polymorphism, Abstraction
-- Ask for real examples from their projects
-- Example: "Can you explain polymorphism and give me an example from your own code?"
+The interview structure, question complexity, and topics MUST adapt to the candidate's experience level.
 
-Questions 4-5: Ask about Data Structures & Algorithms (DSA)
-- Arrays, LinkedLists, Stacks, Queues, Trees, Sorting algorithms
-- Example: "What is the difference between a stack and a queue? When would you use each?"
+Do NOT ask senior-level architecture questions to interns.
+Do NOT ask beginner-level questions to senior candidates.
 
-Questions 6-7: Ask about CRUD & SQL
-- Database operations, SQL queries, joins, indexes
-- Example: "Can you write a SQL query to find all users who have placed more than 3 orders?"
+INTERVIEW STRUCTURE:
 
-Questions 8-9: Ask about System Architecture
-- Client-server model, REST APIs, MVC pattern, microservices basics
-- Example: "Can you explain how a REST API works and what makes it RESTful?"
+FOR INTERN:
+1. Introduction
+2-4. OOP Fundamentals
+5-7. Basic DSA (Arrays, Strings, Stack, Queue basics)
+8-9. Basic SQL & CRUD
+10-11. CV Projects
+12-13. Git, IDEs and Development Tools
+14+. Learning, Problem Solving and Career Goals
 
-Questions 10-11: Ask about their specific projects from CV
-- Reference their actual projects by name
-- Example: "I see you built a job recommendation system — what was the biggest technical challenge you faced?"
-- Ask about tools they used and why they chose them
+FOR ENTRY LEVEL:
+1. Introduction
+2-3. OOP Concepts
+4-5. DSA Fundamentals
+6-7. CRUD & SQL
+8-9. REST APIs and MVC
+10-11. CV Projects
+12-13. Tools & Workflow
+14+. Challenges & Learning
 
-Questions 12-13: Ask about tools and workflow
-- Version control (Git), IDEs, testing, deployment
-- Example: "What tools do you use in your development workflow and why?"
+FOR JUNIOR:
+1. Introduction
+2-3. OOP with real examples
+4-5. DSA and Problem Solving
+6-7. SQL Queries and CRUD
+8-9. REST APIs, MVC and Debugging
+10-11. CV Projects
+12-13. Git, Testing and Deployment
+14+. Technical Challenges & Learning
 
-Question 14+: Ask about challenges and learning
-- "What was the hardest bug you ever fixed and how did you solve it?"
-- "What are you currently learning to improve your skills?"
+FOR MID:
+1. Introduction
+2-3. Advanced OOP and Design Principles
+4-5. DSA Optimization
+6-7. Database Design and SQL Optimization
+8-9. System Design Fundamentals
+10-11. CV Projects
+12-13. Testing, CI/CD and Deployment
+14+. Real-world Challenges & Learning
 
-RULES:
+FOR SENIOR:
+1. Introduction
+2-3. Design Patterns and Advanced OOP
+4-5. Algorithm Trade-offs
+6-7. Database Scaling and Optimization
+8-11. System Design, Scalability, Microservices, Caching, CAP Theorem
+12-13. Leadership, Mentoring and Architecture Decisions
+14+. Technical Challenges, Innovation and Future Vision
+
+FOR LEAD:
+1. Introduction
+2-3. Software Architecture Principles
+4-5. Large-scale System Design
+6-7. Data Architecture and Reliability
+8-11. Distributed Systems, Scalability, Performance and Trade-offs
+12-13. Leadership, Team Management and Strategic Decisions
+14+. Organizational Challenges and Technical Vision
+
+IMPORTANT RULES:
+- Follow the structure for the candidate's experience level
+- For questions 10-11, reference ACTUAL project names from the CV
+- Each question must be unique
+- Difficulty must match the experience level
+- Intern = easy
+- Entry = easy-medium
+- Junior = medium
+- Mid = medium-medium+
+- Senior = hard
+- Lead = hard+
+- Be professional but friendly
 - Ask ONE question at a time
-- Be professional but friendly and encouraging
-- Keep your response to maximum 2 sentences
-- Reference their CV when asking project questions
-- Current question number is: ${questionCount}
-- Do NOT repeat questions already asked in the transcript`;
+- Keep response under 2 sentences
+- Current question number: ${questionCount}
+- Do not repeat previous questions
+`;
 
 
     const history = transcript.map(m => ({

@@ -12,7 +12,7 @@ export default function InterviewForm() {
     const [academicYear, setAcademicYear] = useState("");
     const [experienceLevel, setExperienceLevel] = useState("");
     const [areasToFocus, setAreasToFocus] = useState([]);
-    const [questionCount, setQuestionCount] = useState(5);
+    const [questionCount, setQuestionCount] = useState(15);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
@@ -173,10 +173,10 @@ export default function InterviewForm() {
                         <label className="block text-sm font-medium mb-2">Number of Interview Questions</label>
                         <input
                             type="number"
-                            min={3}
+                            min={15}
                             max={15}
                             value={questionCount}
-                            onChange={(e) => setQuestionCount(e.target.value)}
+                            onChange={(e) => setQuestionCount(Math.max(Number(e.target.value), 15))}
                             className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>

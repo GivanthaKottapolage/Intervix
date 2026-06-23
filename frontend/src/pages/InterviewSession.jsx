@@ -19,7 +19,7 @@ export default function InterviewSession() {
 
     const [session, setSession] = useState(null);
     const [step, setStep] = useState(STEPS.LOADING);
-    const [questionCount, setQuestionCount] = useState(5);
+    const [questionCount, setQuestionCount] = useState(15);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [lastEvaluation, setLastEvaluation] = useState(null);
     const [lastAnswer, setLastAnswer] = useState("");
@@ -38,7 +38,7 @@ export default function InterviewSession() {
         const res = await axios.get(`/api/sessions/${id}`, { headers: authHeaders });
         setSession(res.data);
         setCurrentIndex(res.data.currentQuestionIndex || 0);
-        setQuestionCount(res.data.questionCount || 5);
+        setQuestionCount(Math.max(Number(res.data.questionCount) || 15, 15));
 
         if (res.data.status === "completed") {
             setStep(STEPS.COMPLETE);
@@ -60,6 +60,15 @@ export default function InterviewSession() {
             toast.error("Could not load session");
             navigate("/dashboard");
         });
+
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.onended = null;
+                audioRef.current.onerror = null;
+                audioRef.current = null;
+            }
+        };
     }, [token, navigate, loadSession]);
 
     const playQuestionTts = useCallback(async (index) => {
@@ -73,14 +82,23 @@ export default function InterviewSession() {
             const url = URL.createObjectURL(res.data);
             if (audioRef.current) {
                 audioRef.current.pause();
+                audioRef.current.onended = null;
+                audioRef.current.onerror = null;
             }
             const audio = new Audio(url);
             audioRef.current = audio;
-            await audio.play();
             audio.onended = () => {
                 setPlayingAudio(false);
                 URL.revokeObjectURL(url);
+                audioRef.current = null;
             };
+            audio.onerror = () => {
+                setPlayingAudio(false);
+                URL.revokeObjectURL(url);
+                audioRef.current = null;
+                toast.error("Audio playback failed");
+            };
+            await audio.play();
         } catch (err) {
             setPlayingAudio(false);
             toast.error(err.response?.data?.error || "Could not play question audio");
@@ -92,7 +110,7 @@ export default function InterviewSession() {
         try {
             const res = await axios.post(
                 "/api/ai/prepare",
-                { sessionId: id, questionCount: Number(questionCount) },
+                { sessionId: id, questionCount: Math.max(Number(questionCount), 15) },
                 { headers: authHeaders }
             );
             toast.success(`${res.data.questionCount} questions generated!`);
@@ -237,10 +255,10 @@ export default function InterviewSession() {
                                 <label className="block text-sm font-medium mb-2">Number of questions</label>
                                 <input
                                     type="number"
-                                    min={3}
-                                    max={15}
+                                    min={15}
+                                    max={50}
                                     value={questionCount}
-                                    onChange={(e) => setQuestionCount(e.target.value)}
+                                    onChange={(e) => setQuestionCount(Math.max(Number(e.target.value), 15))}
                                     className="w-full border rounded-2xl px-4 py-3"
                                 />
                             </div>
