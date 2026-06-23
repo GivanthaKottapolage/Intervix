@@ -1,188 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-const STEPS = {
-  LOADING: "loading",
-  PREPARE: "prepare",
-  READY: "ready",
-  INTERVIEWING: "interviewing",
-  FEEDBACK: "feedback",
-  COMPLETE: "complete",
-};
+export default function InterviewForm() {
+    const [fullName, setFullName] = useState("");
+    const [cvFile, setCvFile] = useState(null);
+    const [jobRole, setJobRole] = useState("");
+    const [preferedIndustry, setPreferedIndustry] = useState("");
+    const [university, setUniversity] = useState("");
+    const [academicYear, setAcademicYear] = useState("");
+    const [experienceLevel, setExperienceLevel] = useState("");
+    const [areasToFocus, setAreasToFocus] = useState([]);
+    const [questionCount, setQuestionCount] = useState(15);
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
-const STAGE_ORDER = ["prepare", "ready", "interviewing", "complete"];
-const STAGE_LABELS = { prepare: "Setup", ready: "Ready", interviewing: "Interview", complete: "Done" };
+    const token = localStorage.getItem("token");
 
-function stageIndexFor(step) {
-  if (step === STEPS.FEEDBACK) return STAGE_ORDER.indexOf("interviewing");
-  const idx = STAGE_ORDER.indexOf(step);
-  return idx === -1 ? 0 : idx;
-}
+    async function handleSubmit(e) {
+        e.preventDefault();
 
-// --- inline icons, consistent with the rest of the app ---
-function BoltIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />
-    </svg>
-  );
-}
-function ArrowLeftIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </svg>
-  );
-}
-function MicIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="9" y="2" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0" />
-      <line x1="12" y1="18" x2="12" y2="22" />
-      <line x1="8" y1="22" x2="16" y2="22" />
-    </svg>
-  );
-}
-function StopIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <rect x="6" y="6" width="12" height="12" rx="2" />
-    </svg>
-  );
-}
-function VolumeIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-      <path d="M18.5 6a9 9 0 0 1 0 12" />
-    </svg>
-  );
-}
-function CheckCircleIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M8.5 12.5l2.5 2.5 5-5" />
-    </svg>
-  );
-}
-function AlertIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M12 9v4" />
-      <path d="M12 17h.01" />
-      <circle cx="12" cy="12" r="9" />
-    </svg>
-  );
-}
-function SparkleIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5z" />
-    </svg>
-  );
-}
-function ChevronRightIcon({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <polyline points="9 6 15 12 9 18" />
-    </svg>
-  );
-}
-function Spinner({ className = "" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={`animate-spin ${className}`}>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.2" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function StageTracker({ step }) {
-  const activeIdx = stageIndexFor(step);
-  return (
-    <div className="flex items-center mb-7">
-      {STAGE_ORDER.map((stage, i) => (
-        <div key={stage} className="flex items-center flex-1 last:flex-none">
-          <div className="flex flex-col items-center gap-1.5">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                i < activeIdx
-                  ? "bg-gradient-to-br from-[#00488d] to-[#006a61] text-white"
-                  : i === activeIdx
-                  ? "bg-[#00488d] text-white ring-4 ring-[#00488d]/15"
-                  : "bg-[#e5eeff] text-[#727783]"
-              }`}
-            >
-              {i < activeIdx ? <CheckCircleIcon className="w-4 h-4" /> : i + 1}
-            </div>
-            <span className={`text-[10px] font-medium ${i <= activeIdx ? "text-[#00488d]" : "text-[#727783]"}`}>
-              {STAGE_LABELS[stage]}
-            </span>
-          </div>
-          {i < STAGE_ORDER.length - 1 && (
-            <div className={`flex-1 h-0.5 mx-2 -mt-4 ${i < activeIdx ? "bg-[#00488d]" : "bg-[#e5eeff]"}`} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export default function InterviewSession() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-
-  const [session, setSession] = useState(null);
-  const [step, setStep] = useState(STEPS.LOADING);
-  const [questionCount, setQuestionCount] = useState(5);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [lastEvaluation, setLastEvaluation] = useState(null);
-  const [lastAnswer, setLastAnswer] = useState("");
-  const [recording, setRecording] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [playingAudio, setPlayingAudio] = useState(false);
-
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const audioRef = useRef(null);
-  const fetchedRef = useRef(false);
-
-  const authHeaders = { Authorization: "Bearer " + token };
-
-  const loadSession = useCallback(async () => {
-    const res = await axios.get(`/api/sessions/${id}`, { headers: authHeaders });
-    setSession(res.data);
-    setCurrentIndex(res.data.currentQuestionIndex || 0);
-    setQuestionCount(res.data.questionCount || 5);
-
-    if (res.data.status === "completed") {
-      setStep(STEPS.COMPLETE);
-    } else if (res.data.questions?.length > 0) {
-      setStep(res.data.status === "in-progress" ? STEPS.INTERVIEWING : STEPS.READY);
-    } else {
-      setStep(STEPS.PREPARE);
-    }
-  }, [id, token]);
-
-  useEffect(() => {
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
-    loadSession().catch(() => {
-      toast.error("Could not load session");
-      navigate("/dashboard");
-    });
-  }, [token, navigate, loadSession]);
+        if (!fullName || !cvFile || !jobRole || !preferedIndustry || !university || !academicYear || !experienceLevel || areasToFocus.length === 0) {
+            toast.error("Please fill all fields and upload your CV");
+            return;
+        }
 
   const playQuestionTts = useCallback(
     async (index) => {
@@ -327,10 +169,140 @@ export default function InterviewSession() {
 
   if (step === STEPS.LOADING || !session) {
     return (
-      <div className="min-h-screen bg-[#eef2fb] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Spinner className="w-7 h-7 text-[#00488d]" />
-          <p className="text-[#424752] text-sm">Loading your interview…</p>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+            <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg">
+                <h1 className="text-3xl font-bold text-center mb-8">Interview Preparation Form</h1>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Full Name</label>
+                        <input
+                            type="text"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your full name"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Upload CV (PDF only)</label>
+                        <input
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => setCvFile(e.target.files[0])}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Job Role</label>
+                        <input
+                            type="text"
+                            value={jobRole}
+                            onChange={(e) => setJobRole(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter the job role you're applying for"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Preferred Industry</label>
+                        <input
+                            type="text"
+                            value={preferedIndustry}
+                            onChange={(e) => setPreferedIndustry(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your preferred industry"
+                            required
+                        />
+                    </div>
+
+
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">University / Institution</label>
+                        <input
+                            type="text"
+                            value={university}
+                            onChange={(e) => setUniversity(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your university or institution"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Current Academic Year / Degree</label>
+                        <input
+                            type="text"
+                            value={academicYear}
+                            onChange={(e) => setAcademicYear(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your current academic year or degree"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Experience Level</label>
+                        <select
+                            value={experienceLevel}
+                            onChange={(e) => setExperienceLevel(e.target.value)}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        >
+                            <option value="">Select your experience level</option>
+                            <option value="Internship">Internship</option>
+                            <option value="Entry Level">Entry Level</option>
+                            <option value="Mid Level">Mid Level</option>
+                            <option value="Senior Level">Senior Level</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Areas to Focus On</label>
+                        <input
+                            type="text"
+                            value={areasToFocus}
+                            onChange={(e) => setAreasToFocus(e.target.value.split(",").map(item => item.trim()))}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter areas you want to focus on (comma separated)"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Number of Interview Questions</label>
+                        <input
+                            type="number"
+                            min={15}
+                            max={15}
+                            value={questionCount}
+                            onChange={(e) => setQuestionCount(Math.max(Number(e.target.value), 15))}
+                            className="w-full border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-4 rounded-2xl text-lg transition"
+                    >
+                        {loading ? "Uploading..." : "Submit & Start Preparation"}
+                    </button>
+                </form>
+
+                <button
+                    onClick={() => navigate("/dashboard")}
+                    className="w-full mt-4 text-gray-600 hover:text-gray-800 py-3"
+                >
+                    ← Back to Dashboard
+                </button>
+            </div>
         </div>
       </div>
     );

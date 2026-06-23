@@ -17,7 +17,7 @@ const sessionSchema = new mongoose.Schema({
         enum: ['pending', 'ready', 'in-progress', 'completed']
     },
 
-    questionCount: { type: Number, default: 5 },
+    questionCount: { type: Number, default: 15 },
 
     cvData: { type: Object, default: null },
     cvFileName: { type: String, default: null },
