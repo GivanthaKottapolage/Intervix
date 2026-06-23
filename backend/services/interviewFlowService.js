@@ -30,8 +30,8 @@ const getQuestionAudio = async (questionText) => {
     return convertToSpeech(questionText);
 };
 
-const processUserAnswer = async (audioFilePath, question, cvData) => {
-    const answerText = await transcribeAudio(audioFilePath);
+const processUserAnswer = async (audioBuffer, mimeType, question, cvData) => {
+    const answerText = await transcribeAudio(audioBuffer, mimeType);
     const evaluation = await evaluateAnswer(question, answerText, cvData);
     return { answerText, evaluation };
 };

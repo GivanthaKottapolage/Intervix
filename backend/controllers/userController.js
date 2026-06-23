@@ -69,4 +69,63 @@ const isAdmin = (req) => {
     return true;
 };
 
-module.exports = { createUser, loginUser, isAdmin };
+const Session = require('../models/Session');
+
+const getAdminMetrics = async (req, res) => {
+    try {
+        // 1. Total Registered Students (users with role === 'user')
+        const totalStudentsResult = await User.aggregate([
+            { $match: { role: 'user' } },
+            { $count: 'count' }
+        ]);
+        const totalStudents = totalStudentsResult[0]?.count || 0;
+
+        // 2. Daily Active Users (DAU)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Fetch users who:
+        // - created a session today, OR
+        // - answered a question today, OR
+        // - exchanged messages today
+        const activeUsersResult = await Session.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { createdAt: { $gte: startOfDay, $lte: endOfDay } },
+                        { "answers.answeredAt": { $gte: startOfDay, $lte: endOfDay } },
+                        { "messages.timestamp": { $gte: startOfDay, $lte: endOfDay } }
+                    ]
+                }
+            },
+            {
+                $group: {
+                    _id: "$userEmail"
+                }
+            },
+            {
+                $count: "dau"
+            }
+        ]);
+        const dau = activeUsersResult[0]?.dau || 0;
+
+        // 3. Number of Mock Interview Sessions Completed (status === 'completed')
+        const completedSessionsResult = await Session.aggregate([
+            { $match: { status: 'completed' } },
+            { $count: 'count' }
+        ]);
+        const completedSessions = completedSessionsResult[0]?.count || 0;
+
+        res.json({
+            totalStudents,
+            dau,
+            completedSessions
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error calculating metrics', error: error.message });
+    }
+};
+
+module.exports = { createUser, loginUser, isAdmin, getAdminMetrics };

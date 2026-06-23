@@ -1,27 +1,17 @@
 const Session = require('../models/Session');
 const multer = require('multer');
-const fs = require('fs');
+const { uploadFile } = require('../services/mediaUploads');
 const { DEFAULT_COUNT } = require('../services/geminiService');
 
-const cvDir = 'uploads/cvs/';
-if (!fs.existsSync(cvDir)) {
-    fs.mkdirSync(cvDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, cvDir),
-    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
-});
-
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Only PDF files are allowed'), false);
     }
 });
 
-const createSession = (req, res) => {
+const createSession = async (req, res) => {
     const user = req.user;
 
     if (!user) {
@@ -60,6 +50,9 @@ const createSession = (req, res) => {
         .catch((error) => {
             res.status(500).json({ message: 'Error creating session', error: error.message });
         });
+    } catch (error) {
+        res.status(500).json({ message: 'Error creating session', error: error.message });
+    }
 };
 
 const getMySessions = (req, res) => {
@@ -96,4 +89,41 @@ const getSessionById = (req, res) => {
         });
 };
 
-module.exports = { upload, createSession, getMySessions, getSessionById };
+const getSessionReport = (req, res) => {
+    const user = req.user;
+
+    if (!user) {
+        return res.status(401).json({ message: 'Please login' });
+    }
+
+    Session.findOne({ _id: req.params.id, userEmail: user.email })
+        .then((session) => {
+            if (!session) {
+                return res.status(404).json({ message: 'Session not found' });
+            }
+
+            let overallScore = 0;
+            if (session.report && typeof session.report.overall_score === 'number') {
+                overallScore = session.report.overall_score;
+            } else if (session.answers && session.answers.length > 0) {
+                const sum = session.answers.reduce((acc, curr) => acc + (curr.evaluation?.score || 0), 0);
+                overallScore = Number((sum / session.answers.length).toFixed(1));
+            }
+
+            res.json({
+                _id: session._id,
+                fullName: session.fullName,
+                jobRole: session.jobRole,
+                status: session.status,
+                createdAt: session.createdAt,
+                report: session.report,
+                overallScore: overallScore,
+                answers: session.answers || []
+            });
+        })
+        .catch((error) => {
+            res.status(500).json({ message: 'Error fetching session report', error: error.message });
+        });
+};
+
+module.exports = { upload, createSession, getMySessions, getSessionById, getSessionReport };
