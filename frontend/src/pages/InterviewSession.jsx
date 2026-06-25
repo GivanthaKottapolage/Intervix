@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
@@ -141,7 +141,7 @@ export default function InterviewSession() {
 
   const [session, setSession] = useState(null);
   const [step, setStep] = useState(STEPS.LOADING);
-  const [questionCount, setQuestionCount] = useState(5);
+  const [questionCount, setQuestionCount] = useState(15);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lastEvaluation, setLastEvaluation] = useState(null);
   const [lastAnswer, setLastAnswer] = useState("");
@@ -160,7 +160,7 @@ export default function InterviewSession() {
     const res = await axios.get(`/api/sessions/${id}`, { headers: authHeaders });
     setSession(res.data);
     setCurrentIndex(res.data.currentQuestionIndex || 0);
-    setQuestionCount(res.data.questionCount || 5);
+    setQuestionCount(Math.max(Number(res.data.questionCount) || 15, 15));
 
     if (res.data.status === "completed") {
       setStep(STEPS.COMPLETE);
@@ -214,10 +214,11 @@ export default function InterviewSession() {
 
   async function handlePrepare() {
     setBusy(true);
+    setSession((prev) => (prev ? { ...prev, processingError: null } : prev));
     try {
       const res = await axios.post(
         "/api/ai/prepare",
-        { sessionId: id, questionCount: Number(questionCount) },
+        { sessionId: id, questionCount: Math.max(Number(questionCount), 15) },
         { headers: authHeaders }
       );
       toast.success(`${res.data.questionCount} questions generated!`);
@@ -225,6 +226,7 @@ export default function InterviewSession() {
       setStep(STEPS.READY);
     } catch (err) {
       toast.error(err.response?.data?.error || "Preparation failed");
+      await loadSession();
     } finally {
       setBusy(false);
     }

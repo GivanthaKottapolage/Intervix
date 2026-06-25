@@ -1,4 +1,4 @@
-const { withGeminiRetry } = require('./geminiClient');
+const { withGeminiRetry, generateText } = require('./geminiClient');
 
 const DEFAULT_COUNT = parseInt(process.env.DEFAULT_QUESTION_COUNT || '5', 10);
 
@@ -29,40 +29,72 @@ const generateInterviewQuestions = async (cvData, sessionMeta = {}, questionCoun
 Candidate CV:
 ${cvString}
 
-You MUST follow this exact question order based on the number requested:
+IMPORTANT:
+Candidate Experience Level: ${normalizedLevel}
 
-Question 1: Introduction
-- "Please introduce yourself and tell me about your background."
+The interview structure, question complexity, and topics MUST adapt to the candidate's experience level.
 
-Questions 2-3: OOP Concepts
-- Cover Encapsulation, Inheritance, Polymorphism, Abstraction
-- Ask for real examples from their projects
-- Example: "Can you explain polymorphism and give me an example from your own code?"
+Do NOT ask senior-level architecture questions to interns.
+Do NOT ask beginner-level questions to senior candidates.
 
-Questions 4-5: Data Structures & Algorithms (DSA)
-- Cover Arrays, LinkedLists, Stacks, Queues, Trees, Sorting algorithms
-- Example: "What is the difference between a stack and a queue? When would you use each?"
+INTERVIEW STRUCTURE:
 
-Questions 6-7: CRUD & SQL
-- Cover Database operations, SQL queries, joins, indexes
-- Example: "Can you write a SQL query to find all users who have placed more than 3 orders?"
+FOR INTERN:
+1. Introduction
+2-4. OOP Fundamentals
+5-7. Basic DSA (Arrays, Strings, Stack, Queue basics)
+8-9. Basic SQL & CRUD
+10-11. CV Projects
+12-13. Git, IDEs and Development Tools
+14+. Learning, Problem Solving and Career Goals
 
-Questions 8-9: System Architecture
-- Cover Client-server model, REST APIs, MVC pattern, microservices basics
-- Example: "Can you explain how a REST API works and what makes it RESTful?"
+FOR ENTRY LEVEL:
+1. Introduction
+2-3. OOP Concepts
+4-5. DSA Fundamentals
+6-7. CRUD & SQL
+8-9. REST APIs and MVC
+10-11. CV Projects
+12-13. Tools & Workflow
+14+. Challenges & Learning
 
-Questions 10-11: CV-Specific Projects
-- Reference their actual projects by name from the CV above
-- Example: "I see you built X — what was the biggest technical challenge you faced?"
-- Ask about tools they used and why
+FOR JUNIOR:
+1. Introduction
+2-3. OOP with real examples
+4-5. DSA and Problem Solving
+6-7. SQL Queries and CRUD
+8-9. REST APIs, MVC and Debugging
+10-11. CV Projects
+12-13. Git, Testing and Deployment
+14+. Technical Challenges & Learning
 
-Questions 12-13: Tools & Workflow
-- Cover Version control (Git), IDEs, testing, deployment
-- Example: "What tools do you use in your development workflow and why?"
+FOR MID:
+1. Introduction
+2-3. Advanced OOP and Design Principles
+4-5. DSA Optimization
+6-7. Database Design and SQL Optimization
+8-9. System Design Fundamentals
+10-11. CV Projects
+12-13. Testing, CI/CD and Deployment
+14+. Real-world Challenges & Learning
 
-Questions 14+: Challenges & Learning
-- "What was the hardest bug you ever fixed and how did you solve it?"
-- "What are you currently learning to improve your skills?"
+FOR SENIOR:
+1. Introduction
+2-3. Design Patterns and Advanced OOP
+4-5. Algorithm Trade-offs
+6-7. Database Scaling and Optimization
+8-11. System Design, Scalability, Microservices, Caching, CAP Theorem
+12-13. Leadership, Mentoring and Architecture Decisions
+14+. Technical Challenges, Innovation and Future Vision
+
+FOR LEAD:
+1. Introduction
+2-3. Software Architecture Principles
+4-5. Large-scale System Design
+6-7. Data Architecture and Reliability
+8-11. Distributed Systems, Scalability, Performance and Trade-offs
+12-13. Leadership, Team Management and Strategic Decisions
+14+. Organizational Challenges and Technical Vision
 
 IMPORTANT RULES:
 - Only generate the number of questions requested (${count})
@@ -78,8 +110,7 @@ Return ONLY a valid JSON array (no markdown, no extra text):
 ]`;
 
     const questions = await withGeminiRetry(async (model) => {
-        const result = await model.generateContent(prompt);
-        const raw = result.response.text();
+        const raw = await generateText(model, prompt);
         console.log('[Gemini] Raw question response length:', raw.length);
 
         const parsed = parseJsonFromGemini(raw);
@@ -127,8 +158,7 @@ Return ONLY valid JSON:
 Score 0-10. "correct" is true if score >= 6.`;
 
     return withGeminiRetry(async (model) => {
-        const result = await model.generateContent(prompt);
-        const evaluation = parseJsonFromGemini(result.response.text());
+        const evaluation = parseJsonFromGemini(await generateText(model, prompt));
         console.log(`[Gemini] Evaluation score: ${evaluation.score} | correct: ${evaluation.correct}`);
         return evaluation;
     }, 'evaluate_answer');
@@ -239,8 +269,7 @@ Return ONLY valid JSON. No markdown, no extra text. Use this structure:
 }`;
 
     return withGeminiRetry(async (model) => {
-        const result = await model.generateContent(prompt);
-        return parseJsonFromGemini(result.response.text());
+        return parseJsonFromGemini(await generateText(model, prompt));
     }, 'generate_report');
 };
 

@@ -117,9 +117,6 @@ function SparkleIcon({ className = "" }) {
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: GridIcon },
-  { to: "/mock-interviews", label: "Mock Interviews", icon: MicIcon },
-  { to: "/skill-analysis", label: "Skill Analysis", icon: ChartIcon },
-  { to: "/resume-review", label: "Resume Review", icon: DocIcon },
   { to: "/settings", label: "Settings", icon: GearIcon },
 ];
 
@@ -145,11 +142,16 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
   const studentName = localStorage.getItem("name") || "";
 
   useEffect(() => {
     if (!token) {
       navigate("/login");
+      return;
+    }
+    if (role === "admin") {
+      navigate("/admin-dashboard");
       return;
     }
     fetchSessions();
@@ -169,16 +171,10 @@ export default function StudentDashboard() {
       setLoading(false);
     }
   }
-useEffect(() => {
-  if (!token) {
-    navigate("/login");
-    return;
-  }
-  fetchSessions();
-}, [token, navigate, fetchSessions]);
 
   function handleLogout() {
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
     navigate("/login");
   }
 
@@ -246,10 +242,7 @@ useEffect(() => {
               </span>
             </div>
           </div>
-          <Link to="/help" className="flex items-center gap-3 p-3 text-sm text-[#424752] hover:text-[#0b1c30] transition-all">
-            <HelpIcon className="w-5 h-5" />
-            Help Center
-          </Link>
+          
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 p-3 text-sm text-left text-[#ba1a1a] hover:text-[#ba1a1a]/80 transition-all"
@@ -273,16 +266,7 @@ useEffect(() => {
                 : "Let's get your first mock interview started."}
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden lg:flex items-center gap-2 bg-[#dce9ff] px-4 py-2 rounded-full border border-[#c2c6d4]/30">
-              <StarIcon className="w-4 h-4 text-[#006a61]" />
-              <span className="text-sm font-medium">Pro Account</span>
-            </div>
-            <div className="w-10 h-10 bg-white/70 backdrop-blur-xl border border-black/5 rounded-full flex items-center justify-center relative cursor-pointer hover:bg-white transition-colors">
-              <BellIcon className="w-5 h-5" />
-              <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#006a61] rounded-full border-2 border-[#eef2fb]" />
-            </div>
-          </div>
+          
         </header>
 
         {/* Stats */}
@@ -343,11 +327,6 @@ useEffect(() => {
           <div className="lg:col-span-8 flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Interview History</h2>
-              {sessions.length > 0 && (
-                <Link to="/mock-interviews" className="text-[#00488d] text-sm font-semibold hover:underline">
-                  View All
-                </Link>
-              )}
             </div>
 
             {loading ? (
@@ -413,17 +392,10 @@ useEffect(() => {
                 <SparkleIcon className="w-5 h-5 text-[#00488d]" />
                 <h3 className="text-lg font-semibold">AI Coach Tip</h3>
               </div>
-              <p className="text-sm text-[#424752] leading-relaxed mb-4">
+              <p className="text-sm text-[#424752] leading-relaxed">
                 Use the <strong>STAR method</strong> — Situation, Task, Action, Result — to keep behavioral
                 answers structured and easy to follow.
               </p>
-              <Link
-                to="/resume-review"
-                className="w-full py-3 bg-[#dce9ff] rounded-lg text-sm font-medium hover:bg-[#d3e4fe] transition-colors flex items-center justify-center gap-2 border border-[#c2c6d4]/10"
-              >
-                <DocIcon className="w-4 h-4" />
-                Review my resume
-              </Link>
             </div>
 
             <div className="bg-white/70 backdrop-blur-xl border border-black/5 rounded-xl p-6 shadow-sm">
@@ -436,20 +408,6 @@ useEffect(() => {
                   <PlusIcon className="w-4 h-4 text-[#00488d]" />
                   Start a new mock interview
                 </Link>
-                <Link
-                  to="/skill-analysis"
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-[#eff4ff] transition-colors text-sm font-medium"
-                >
-                  <ChartIcon className="w-4 h-4 text-[#00488d]" />
-                  View skill analysis
-                </Link>
-                <Link
-                  to="/mock-interviews"
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-[#eff4ff] transition-colors text-sm font-medium"
-                >
-                  <MicIcon className="w-4 h-4 text-[#00488d]" />
-                  Browse mock interviews
-                </Link>
               </div>
             </div>
           </div>
@@ -458,7 +416,7 @@ useEffect(() => {
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-[#c2c6d4]/20 flex justify-around py-3 px-4 z-30">
-        {NAV_ITEMS.slice(0, 4).map(({ to, label, icon: Icon }) => (
+        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
