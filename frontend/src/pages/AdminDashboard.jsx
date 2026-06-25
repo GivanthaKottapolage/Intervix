@@ -245,11 +245,11 @@ function Avatar({ name }) {
   );
 }
 
-function SessionsTable({ sessions, loading, onExport, onView }) {
-  const cols = ["Student Name", "Job Role", "Industry", "Experience", "Status", "Questions", "Date", "Action"];
+function SessionsTable({ sessions, loading, onExport }) {
+  const cols = ["Student Name", "Job Role", "Industry", "Experience", "Status", "Questions", "Date"];
   return (
     <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 4px 20px rgba(13,92,107,0.07)", border: "1px solid #e7eeff", overflow: "hidden" }}>
-      <div style={{ padding: "20px 24px", borderBottom: "1px solid #e7eeff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "20px 24px", borderBottom: "1px solid #e7eeff", display: "flex", justifycontent: "space-between", alignItems: "center" }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: COLORS.onSurface, margin: 0 }}>All Student Sessions</h2>
           <p style={{ fontSize: 12, color: COLORS.onSurfaceVariant, margin: "2px 0 0" }}>Monitoring real-time interview performance</p>
@@ -283,7 +283,7 @@ function SessionsTable({ sessions, loading, onExport, onView }) {
                   key={c}
                   style={{
                     padding: "12px 24px",
-                    textAlign: c === "Questions" ? "center" : c === "Action" ? "right" : "left",
+                    textAlign: c === "Questions" ? "center" : "left",
                     fontSize: 10,
                     fontWeight: 700,
                     color: COLORS.onSurfaceVariant,
@@ -301,9 +301,9 @@ function SessionsTable({ sessions, loading, onExport, onView }) {
             {loading
               ? Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} style={{ borderTop: "1px solid #f0f3ff" }}>
-                    {Array.from({ length: 8 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <td key={j} style={{ padding: "16px 24px" }}>
-                        <Skeleton style={{ height: 16, width: j === 4 ? 80 : j === 7 ? 64 : 96 }} />
+                        <Skeleton style={{ height: 16, width: j === 4 ? 80 : 96 }} />
                       </td>
                     ))}
                   </tr>
@@ -311,7 +311,7 @@ function SessionsTable({ sessions, loading, onExport, onView }) {
               : sessions.length === 0
                 ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: "center", padding: 40, color: COLORS.onSurfaceVariant, fontSize: 14 }}>
+                      <td colSpan={7} style={{ textAlign: "center", padding: 40, color: COLORS.onSurfaceVariant, fontSize: 14 }}>
                         No sessions found.
                       </td>
                     </tr>
@@ -330,24 +330,6 @@ function SessionsTable({ sessions, loading, onExport, onView }) {
                       <td style={{ padding: "14px 24px" }}><StatusBadge status={s.status} /></td>
                       <td style={{ padding: "14px 24px", textAlign: "center", color: COLORS.onSurface, fontSize: 14 }}>{s.questions}</td>
                       <td style={{ padding: "14px 24px", color: COLORS.onSurfaceVariant, fontSize: 14, whiteSpace: "nowrap" }}>{formatDate(s.date)}</td>
-                      <td style={{ padding: "14px 24px", textAlign: "right" }}>
-                        <button
-                          type="button"
-                          onClick={() => onView(s.id)}
-                          style={{
-                            padding: "6px 14px",
-                            border: `1px solid ${COLORS.primary}`,
-                            color: COLORS.primary,
-                            borderRadius: 8,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background: "none",
-                            cursor: "pointer",
-                          }}
-                        >
-                          View
-                        </button>
-                      </td>
                     </tr>
                   ))}
           </tbody>
@@ -486,10 +468,6 @@ export default function AdminDashboard() {
     exportSessionsCsv(sessions);
   }
 
-  function handleViewSession(sessionId) {
-    navigate(`/report/${sessionId}`);
-  }
-
   return (
     <>
       <style>{`
@@ -570,7 +548,6 @@ export default function AdminDashboard() {
             sessions={loaded ? sessions : []}
             loading={!loaded}
             onExport={handleExportCsv}
-            onView={handleViewSession}
           />
           <UsersTable users={loaded ? users : []} loading={!loaded} />
         </main>
