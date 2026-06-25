@@ -50,6 +50,8 @@ const prepareInterview = async (req, res) => {
 
         const count = Math.max(parseInt(questionCount, 10) || session.questionCount || DEFAULT_COUNT, 15);
         session.questionCount = count;
+        session.processingError = null;
+        await session.save();
 
         const { cvData, questions } = await prepareSession(session, count);
 

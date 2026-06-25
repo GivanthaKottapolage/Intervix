@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
@@ -39,135 +39,78 @@ export default function InterviewForm() {
         if (audioRef.current) {
           audioRef.current.pause();
         }
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        await audio.play();
-        audio.onended = () => {
-          setPlayingAudio(false);
-          URL.revokeObjectURL(url);
-        };
-      } catch (err) {
-        setPlayingAudio(false);
-        toast.error(err.response?.data?.error || "Could not play question audio");
-      }
-    },
-    [id, token]
-  );
-
-  async function handlePrepare() {
-    setBusy(true);
-    try {
-      const res = await axios.post(
-        "/api/ai/prepare",
-        { sessionId: id, questionCount: Number(questionCount) },
-        { headers: authHeaders }
-      );
-      toast.success(`${res.data.questionCount} questions generated!`);
-      await loadSession();
-      setStep(STEPS.READY);
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Preparation failed");
-    } finally {
-      setBusy(false);
+        setAreaInput("");
     }
-  }
 
-  async function handleStartInterview() {
-    setBusy(true);
-    try {
-      await axios.post("/api/ai/start", { sessionId: id }, { headers: authHeaders });
-      await loadSession();
-      setCurrentIndex(0);
-      setStep(STEPS.INTERVIEWING);
-      await playQuestionTts(0);
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Could not start interview");
-    } finally {
-      setBusy(false);
+    function removeArea(index) {
+        setAreasToFocus((prev) => prev.filter((_, i) => i !== index));
     }
-  }
 
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        await submitAnswer(blob);
-      };
-
-      recorder.start();
-      setRecording(true);
-    } catch {
-      toast.error("Microphone access denied");
+    function handleAreaKeyDown(e) {
+        if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addArea(areaInput);
+        }
     }
-  }
 
-  function stopRecording() {
-    if (mediaRecorderRef.current && recording) {
-      mediaRecorderRef.current.stop();
-      setRecording(false);
+    function clearFile() {
+        setCvFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }
 
-  async function submitAnswer(audioBlob) {
-    setBusy(true);
-    const formData = new FormData();
-    formData.append("audio", audioBlob, "answer.webm");
-    formData.append("sessionId", id);
-
-    try {
-      const res = await axios.post("/api/ai/submit-answer", formData, {
-        headers: authHeaders,
-      });
-
-      setLastAnswer(res.data.answerText);
-      setLastEvaluation(res.data.evaluation);
-      setStep(STEPS.FEEDBACK);
-
-      if (res.data.isComplete) {
-        toast.success("Interview completed!");
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to process answer");
-    } finally {
-      setBusy(false);
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     }
-  }
 
-  async function handleNextQuestion() {
-    setBusy(true);
-    try {
-      const fresh = await axios.get(`/api/sessions/${id}`, { headers: authHeaders });
-      setSession(fresh.data);
+    async function handleSubmit(e) {
+        e.preventDefault();
 
-      if (fresh.data.status === "completed") {
-        setStep(STEPS.COMPLETE);
-        return;
-      }
+        if (
+            !fullName ||
+            !cvFile ||
+            !jobRole ||
+            !preferedIndustry ||
+            !university ||
+            !academicYear ||
+            !experienceLevel ||
+            areasToFocus.length === 0
+        ) {
+            toast.error("Please fill all fields and upload your CV");
+            return;
+        }
 
-      const nextIndex = fresh.data.currentQuestionIndex;
-      setCurrentIndex(nextIndex);
-      setLastEvaluation(null);
-      setLastAnswer("");
-      setStep(STEPS.INTERVIEWING);
-      await playQuestionTts(nextIndex);
-    } catch {
-      toast.error("Could not load next question");
-    } finally {
-      setBusy(false);
+        setLoading(true);
+        const formData = new FormData();
+        formData.append("fullName", fullName);
+        formData.append("cv", cvFile);
+        formData.append("jobRole", jobRole);
+        formData.append("preferedIndustry", preferedIndustry);
+        formData.append("university", university);
+        formData.append("academicYear", academicYear);
+        formData.append("experienceLevel", experienceLevel);
+        formData.append("areasToFocus", JSON.stringify(areasToFocus));
+        formData.append("questionCount", String(questionCount));
+
+        try {
+            await axios.post("/api/sessions/", formData, {
+                headers: { Authorization: "Bearer " + token },
+            });
+            toast.success("CV uploaded successfully! Session created.");
+            navigate("/dashboard");
+        } catch (err) {
+            const message =
+                err.response?.data?.message ||
+                err.response?.data?.error ||
+                "Failed to upload CV. Please try again.";
+            toast.error(message);
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     }
-  }
 
-  if (step === STEPS.LOADING || !session) {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
             <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg">
@@ -360,189 +303,248 @@ export default function InterviewForm() {
                 Question {Math.min(currentIndex + 1, total)} / {total}
               </p>
             </div>
-          )}
 
-          {/* PREPARE */}
-          {step === STEPS.PREPARE && (
-            <div className="flex flex-col gap-5">
-              <p className="text-[#424752]">Prepare your AI interview from your uploaded CV.</p>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Number of questions</label>
-                <div className="bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-[#424752]">3</span>
-                    <span className="text-lg font-bold text-[#00488d]">{questionCount}</span>
-                    <span className="text-xs text-[#424752]">15</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={3}
-                    max={15}
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(e.target.value)}
-                    className="w-full accent-[#00488d]"
-                  />
+            <div className="relative max-w-3xl mx-auto px-4 md:px-6 py-10 md:py-14">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 bg-gradient-to-br from-[#00488d] to-[#006a61] rounded-lg flex items-center justify-center">
+                            <span className="text-white font-bold text-sm">IX</span>
+                        </div>
+                        <span className="text-lg font-bold">Intervix</span>
+                    </div>
+                    <button
+                        onClick={() => navigate("/dashboard")}
+                        className="flex items-center gap-1.5 text-sm font-medium text-[#424752] hover:text-[#00488d] transition-colors"
+                    >
+                        ← Back to Dashboard
+                    </button>
                 </div>
-              </div>
 
-              {session.processingError && (
-                <p className="text-sm text-[#ba1a1a] bg-red-50 p-3 rounded-lg">{session.processingError}</p>
-              )}
+                <div className="bg-white/70 backdrop-blur-xl border border-black/5 rounded-2xl shadow-xl p-6 md:p-9">
+                    <div className="mb-7">
+                        <h1 className="text-2xl md:text-[28px] font-bold mb-1">
+                            Interview Preparation Form
+                        </h1>
+                        <p className="text-sm text-[#424752]">
+                            Tell us about the role you're targeting and we'll generate tailored mock interview questions from your CV.
+                        </p>
+                    </div>
 
-              <button
-                onClick={handlePrepare}
-                disabled={busy}
-                className="w-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)] disabled:opacity-60"
-              >
-                {busy && <Spinner className="w-4 h-4" />}
-                {busy ? "Generating questions…" : "Prepare Interview"}
-              </button>
-            </div>
-          )}
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-7">
+                        {/* Your Profile */}
+                        <div className="flex flex-col gap-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-[#727783]">
+                                Your Profile
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        placeholder="Enter your full name"
+                                        className={fieldClass}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">University / Institution</label>
+                                    <input
+                                        type="text"
+                                        value={university}
+                                        onChange={(e) => setUniversity(e.target.value)}
+                                        placeholder="Enter your university or institution"
+                                        className={fieldClass}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Current Academic Year / Degree</label>
+                                    <input
+                                        type="text"
+                                        value={academicYear}
+                                        onChange={(e) => setAcademicYear(e.target.value)}
+                                        placeholder="e.g. 3rd Year, BSc IT"
+                                        className={fieldClass}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Experience Level</label>
+                                    <select
+                                        value={experienceLevel}
+                                        onChange={(e) => setExperienceLevel(e.target.value)}
+                                        className={fieldClass}
+                                        required
+                                    >
+                                        <option value="">Select your experience level</option>
+                                        <option value="Internship">Internship</option>
+                                        <option value="Entry Level">Entry Level</option>
+                                        <option value="Mid Level">Mid Level</option>
+                                        <option value="Senior Level">Senior Level</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
 
-          {/* READY */}
-          {step === STEPS.READY && (
-            <div className="flex flex-col items-center text-center gap-5 py-2">
-              <div className="w-14 h-14 rounded-full bg-[#86f2e4]/60 flex items-center justify-center">
-                <CheckCircleIcon className="w-7 h-7 text-[#006a61]" />
-              </div>
-              <p className="text-[#006a61] font-semibold">{total} questions ready</p>
-              <button
-                onClick={handleStartInterview}
-                disabled={busy}
-                className="w-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)] disabled:opacity-60"
-              >
-                {busy && <Spinner className="w-4 h-4" />}
-                {busy ? "Starting…" : "Start Interview"}
-              </button>
-            </div>
-          )}
+                        {/* Target Role */}
+                        <div className="flex flex-col gap-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-[#727783]">
+                                Target Role
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Job Role</label>
+                                    <input
+                                        type="text"
+                                        value={jobRole}
+                                        onChange={(e) => setJobRole(e.target.value)}
+                                        placeholder="e.g. Frontend Developer"
+                                        className={fieldClass}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Preferred Industry</label>
+                                    <input
+                                        type="text"
+                                        value={preferedIndustry}
+                                        onChange={(e) => setPreferedIndustry(e.target.value)}
+                                        placeholder="e.g. FinTech, Healthcare"
+                                        className={fieldClass}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-          {/* INTERVIEWING */}
-          {step === STEPS.INTERVIEWING && currentQuestion && (
-            <div className="flex flex-col gap-6">
-              <div className="bg-[#eff4ff] rounded-xl p-6 border border-[#c2c6d4]/30">
-                <p className="text-lg font-medium leading-relaxed">{currentQuestion.question}</p>
-                {playingAudio && (
-                  <p className="text-sm text-[#00488d] mt-3 flex items-center gap-1.5">
-                    <VolumeIcon className="w-4 h-4 animate-pulse" />
-                    AI is asking the question…
-                  </p>
-                )}
-              </div>
+                        {/* CV Upload */}
+                        <div className="flex flex-col gap-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-[#727783]">
+                                Your CV
+                            </p>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Upload CV (PDF only)</label>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={(e) => setCvFile(e.target.files[0] || null)}
+                                    className="hidden"
+                                    required={!cvFile}
+                                />
+                                {cvFile ? (
+                                    <div className="flex items-center justify-between gap-3 bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-4 py-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <span className="text-[#006a61]">✓</span>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium truncate">{cvFile.name}</p>
+                                                <p className="text-xs text-[#424752]">{formatBytes(cvFile.size)}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={clearFile}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center text-[#424752] hover:bg-white hover:text-red-500 transition-colors shrink-0"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-full border-2 border-dashed border-[#c2c6d4] rounded-lg px-4 py-6 flex flex-col items-center justify-center gap-2 text-[#424752] hover:border-[#00488d] hover:bg-[#eff4ff] hover:text-[#00488d] transition-all"
+                                    >
+                                        <span className="text-2xl">↑</span>
+                                        <span className="text-sm font-medium">Click to upload your CV</span>
+                                        <span className="text-xs">PDF only</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
 
-              <div className="border-2 border-dashed border-[#c2c6d4] rounded-xl p-8 flex flex-col items-center gap-4 text-center">
-                <p className="text-[#424752] text-sm">Record your answer after the question plays</p>
+                        {/* Interview Setup */}
+                        <div className="flex flex-col gap-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-[#727783]">
+                                Interview Setup
+                            </p>
 
-                {!recording ? (
-                  <button
-                    onClick={startRecording}
-                    disabled={busy || playingAudio}
-                    className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white flex items-center justify-center shadow-lg shadow-[#00488d]/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
-                  >
-                    <MicIcon className="w-7 h-7" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={stopRecording}
-                    className="w-16 h-16 rounded-full bg-[#ba1a1a] text-white flex items-center justify-center shadow-lg shadow-[#ba1a1a]/30 animate-pulse"
-                  >
-                    <StopIcon className="w-6 h-6" />
-                  </button>
-                )}
-                <span className="text-sm font-medium text-[#424752]">
-                  {recording ? "Tap to stop & submit" : "Tap to start recording"}
-                </span>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Areas to Focus On</label>
+                                <div
+                                    onClick={() => document.getElementById("area-input")?.focus()}
+                                    className="w-full bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-3 py-2.5 flex flex-wrap gap-2 items-center cursor-text focus-within:ring-2 focus-within:ring-[#005db5]/20 focus-within:border-[#00488d] focus-within:bg-white transition-all"
+                                >
+                                    {areasToFocus.map((area, i) => (
+                                        <span
+                                            key={area + i}
+                                            className="flex items-center gap-1.5 bg-[#dce9ff] text-[#00488d] text-sm font-medium px-3 py-1 rounded-full"
+                                        >
+                                            {area}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeArea(i)}
+                                                className="hover:text-red-500 transition-colors"
+                                            >
+                                                ✕
+                                            </button>
+                                        </span>
+                                    ))}
+                                    <input
+                                        id="area-input"
+                                        type="text"
+                                        value={areaInput}
+                                        onChange={(e) => setAreaInput(e.target.value)}
+                                        onKeyDown={handleAreaKeyDown}
+                                        onBlur={() => areaInput && addArea(areaInput)}
+                                        placeholder={
+                                            areasToFocus.length === 0
+                                                ? "Type a focus area and press Enter (e.g. System Design)"
+                                                : "Add another…"
+                                        }
+                                        className="flex-1 min-w-[140px] bg-transparent outline-none text-sm placeholder:text-[#727783] py-1"
+                                    />
+                                </div>
+                                <p className="text-xs text-[#727783] mt-1">
+                                    Press Enter or comma after each area to add it as a tag.
+                                </p>
+                            </div>
 
-                {busy && (
-                  <p className="text-sm text-[#424752] flex items-center gap-2 mt-1">
-                    <Spinner className="w-4 h-4 text-[#00488d]" />
-                    Processing with Whisper + Gemini…
-                  </p>
-                )}
-              </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">
+                                    Number of Interview Questions
+                                </label>
+                                <div className="bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-4 py-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs text-[#424752]">3</span>
+                                        <span className="text-lg font-bold text-[#00488d]">{questionCount}</span>
+                                        <span className="text-xs text-[#424752]">15</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={3}
+                                        max={15}
+                                        value={questionCount}
+                                        onChange={(e) => setQuestionCount(Number(e.target.value))}
+                                        className="w-full accent-[#00488d]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-              <button
-                onClick={() => playQuestionTts(currentIndex)}
-                disabled={playingAudio}
-                className="text-sm font-medium text-[#00488d] hover:underline disabled:opacity-50 self-center"
-              >
-                Replay question audio
-              </button>
-            </div>
-          )}
-
-          {/* FEEDBACK */}
-          {step === STEPS.FEEDBACK && lastEvaluation && (
-            <div className="flex flex-col gap-4">
-              <div className="bg-[#eff4ff] rounded-xl p-4 border border-[#c2c6d4]/30">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#424752] mb-1">Your answer</p>
-                <p className="text-sm">{lastAnswer}</p>
-              </div>
-
-              <div className="bg-white border border-[#c2c6d4]/30 rounded-xl p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {lastEvaluation.correct ? (
-                      <CheckCircleIcon className="w-5 h-5 text-[#006a61]" />
-                    ) : (
-                      <AlertIcon className="w-5 h-5 text-[#9a6700]" />
-                    )}
-                    <span className="font-semibold">
-                      {lastEvaluation.correct ? "Good answer" : "Needs improvement"}
-                    </span>
-                  </div>
-                  <span className="text-xl font-bold text-[#00488d]">{lastEvaluation.score}/10</span>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)] disabled:opacity-60"
+                        >
+                            {loading ? "Uploading…" : "Submit & Start Preparation"}
+                        </button>
+                    </form>
                 </div>
-                <div className="w-full h-1.5 bg-[#d3e4fe] rounded-full overflow-hidden mb-4">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#00488d] to-[#006a61]"
-                    style={{ width: `${Math.min(lastEvaluation.score, 10) * 10}%` }}
-                  />
-                </div>
-                <p className="text-sm text-[#424752] leading-relaxed">{lastEvaluation.feedback}</p>
-                {lastEvaluation.improvement && (
-                  <div className="flex items-start gap-2 mt-3 bg-[#eff4ff] rounded-lg p-3">
-                    <SparkleIcon className="w-4 h-4 text-[#00488d] shrink-0 mt-0.5" />
-                    <p className="text-sm text-[#424752]">
-                      <strong className="text-[#0b1c30]">Tip: </strong>
-                      {lastEvaluation.improvement}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={handleNextQuestion}
-                disabled={busy}
-                className="w-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)] disabled:opacity-60"
-              >
-                {busy && <Spinner className="w-4 h-4" />}
-                {session.status === "completed" ? "Finish Interview" : "Next Question"}
-                {!busy && <ChevronRightIcon className="w-4 h-4" />}
-              </button>
             </div>
-          )}
-
-          {/* COMPLETE */}
-          {step === STEPS.COMPLETE && (
-            <div className="flex flex-col items-center text-center gap-4 py-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00488d] to-[#006a61] flex items-center justify-center">
-                <CheckCircleIcon className="w-8 h-8 text-white" />
-              </div>
-              <p className="text-xl font-bold">Interview completed!</p>
-              <p className="text-[#424752]">All answers and feedback have been saved to your session.</p>
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="mt-2 inline-flex items-center gap-2 bg-[#eff4ff] hover:bg-[#dce9ff] text-[#00488d] font-semibold px-6 py-3 rounded-xl transition-colors"
-              >
-                Back to Dashboard
-              </button>
-            </div>
-          )}
         </div>
-      </div>
-    </div>
-  );
+    );
 }

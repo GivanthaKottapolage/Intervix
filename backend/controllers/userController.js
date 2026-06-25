@@ -128,4 +128,18 @@ const getAdminMetrics = async (req, res) => {
     }
 };
 
-module.exports = { createUser, loginUser, isAdmin, getAdminMetrics };
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find().sort({ _id: -1 }).select('-password');
+        res.json(users.map((u) => ({
+            name: u.fullName,
+            email: u.email,
+            role: u.role || 'user',
+            joinedDate: (u.createdAt || u._id.getTimestamp()).toISOString()
+        })));
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching users', error: error.message });
+    }
+};
+
+module.exports = { createUser, loginUser, isAdmin, getAdminMetrics, getAllUsers };

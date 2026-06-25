@@ -2,7 +2,7 @@
  * Feature 5 — Audio transcription via Gemini (no OpenAI key needed).
  * Sends the audio file to Gemini and asks it to return a verbatim transcript.
  */
-const { withGeminiRetry } = require('./geminiClient');
+const { withGeminiRetry, generateWithParts } = require('./geminiClient');
 
 const transcribeAudio = async (audioBuffer, mimeType = 'audio/webm') => {
     console.log('[Transcribe] Processing memory buffer of size:', audioBuffer ? audioBuffer.length : 0);
@@ -16,11 +16,10 @@ const transcribeAudio = async (audioBuffer, mimeType = 'audio/webm') => {
     const prompt = 'Transcribe the following audio exactly as spoken. Return ONLY the transcribed text, nothing else.';
 
     const text = await withGeminiRetry(async (model) => {
-        const result = await model.generateContent([
-            { text: prompt },
+        const transcript = (await generateWithParts(model, [
+            prompt,
             { inlineData: { mimeType, data: base64 } }
-        ]);
-        const transcript = result.response.text().trim();
+        ])).trim();
         console.log('[Transcribe] Result:', transcript.slice(0, 100));
         return transcript;
     }, 'transcribe_audio');

@@ -1,4 +1,4 @@
-const { withGeminiRetry } = require('./geminiClient');
+const { withGeminiRetry, generateText } = require('./geminiClient');
 
 const DEFAULT_COUNT = parseInt(process.env.DEFAULT_QUESTION_COUNT || '15', 10);
 
@@ -210,8 +210,7 @@ Return ONLY a valid JSON array (no markdown, no extra text):
 ]`;
 
     const questions = await withGeminiRetry(async (model) => {
-        const result = await model.generateContent(prompt);
-        const raw = result.response.text();
+        const raw = await generateText(model, prompt);
         console.log('[Gemini] Raw question response length:', raw.length);
 
         const parsed = parseJsonFromGemini(raw);
@@ -259,8 +258,7 @@ Return ONLY valid JSON:
 Score 0-10. "correct" is true if score >= 6.`;
 
     return withGeminiRetry(async (model) => {
-        const result = await model.generateContent(prompt);
-        const evaluation = parseJsonFromGemini(result.response.text());
+        const evaluation = parseJsonFromGemini(await generateText(model, prompt));
         console.log(`[Gemini] Evaluation score: ${evaluation.score} | correct: ${evaluation.correct}`);
         return evaluation;
     }, 'evaluate_answer');
@@ -435,8 +433,7 @@ Return ONLY valid JSON. No markdown, no extra text. Use this structure:
 }`;
 
     return withGeminiRetry(async (model) => {
-        const result = await model.generateContent(prompt);
-        return parseJsonFromGemini(result.response.text());
+        return parseJsonFromGemini(await generateText(model, prompt));
     }, 'generate_report');
 };
 
