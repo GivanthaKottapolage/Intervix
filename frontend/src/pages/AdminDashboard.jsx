@@ -515,6 +515,26 @@ export default function AdminDashboard() {
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <button
                 type="button"
+                onClick={() => navigate("/admin/reviews")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: 9999,
+                  border: "none",
+                  background: "#f0f3ff",
+                  color: COLORS.primary,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer"
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>rate_review</span>
+                Reviews
+              </button>
+              <button
+                type="button"
                 onClick={fetchData}
                 style={{ width: 38, height: 38, borderRadius: "50%", border: "none", background: "#f0f3ff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.onSurfaceVariant }}
                 title="Refresh"

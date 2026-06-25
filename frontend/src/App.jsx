@@ -7,6 +7,7 @@ import InterviewSession from './pages/InterviewSession'
 import StudentDashboard from './pages/StudentDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import PerformanceReport from './pages/PerformanceReport'
+import AdminReviews from './pages/AdminReviews'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/dashboard" element={<StudentDashboard />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/reviews" element={<AdminReviews />} />
         <Route path="/report/:id" element={<PerformanceReport />} />
         <Route path="/interview-form" element={<InterviewForm />} />
         <Route path="/interview/:id" element={<InterviewSession />} />

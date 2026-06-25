@@ -137,6 +137,17 @@ function statusBadge(status) {
   }
 }
 
+function getSessionScore(session) {
+  if (session.report && typeof session.report.overall_score === 'number') {
+    return session.report.overall_score;
+  }
+  if (session.answers && session.answers.length > 0) {
+    const sum = session.answers.reduce((acc, curr) => acc + (curr.evaluation?.score || 0), 0);
+    return Number((sum / session.answers.length).toFixed(1));
+  }
+  return null;
+}
+
 export default function StudentDashboard() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -144,6 +155,14 @@ export default function StudentDashboard() {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
   const studentName = localStorage.getItem("name") || "";
+
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewText, setReviewText] = useState("");
+  const [rating, setRating] = useState(5);
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [editReviewText, setEditReviewText] = useState("");
+  const [editRating, setEditRating] = useState(5);
 
   useEffect(() => {
     if (!token) {
@@ -155,7 +174,81 @@ export default function StudentDashboard() {
       return;
     }
     fetchSessions();
+    fetchReviews();
   }, []);
+
+  async function fetchReviews() {
+    try {
+      setReviewsLoading(true);
+      const res = await axios.get("/api/reviews/my", {
+        headers: { Authorization: "Bearer " + token },
+      });
+      setReviews(res.data);
+    } catch (err) {
+      console.log(err);
+      toast.error("Couldn't load your reviews");
+    } finally {
+      setReviewsLoading(false);
+    }
+  }
+
+  async function handleSubmitReview(e) {
+    e.preventDefault();
+    if (!reviewText.trim()) {
+      toast.error("Please enter a review message");
+      return;
+    }
+    try {
+      await axios.post("/api/reviews", {
+        review_text: reviewText,
+        rating
+      }, {
+        headers: { Authorization: "Bearer " + token }
+      });
+      toast.success("Review submitted successfully!");
+      setReviewText("");
+      setRating(5);
+      fetchReviews();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || "Failed to submit review";
+      toast.error(msg);
+    }
+  }
+
+  async function handleUpdateReview(id) {
+    if (!editReviewText.trim()) {
+      toast.error("Review message cannot be empty");
+      return;
+    }
+    try {
+      await axios.put(`/api/reviews/${id}`, {
+        review_text: editReviewText,
+        rating: editRating
+      }, {
+        headers: { Authorization: "Bearer " + token }
+      });
+      toast.success("Review updated successfully!");
+      setEditingReviewId(null);
+      fetchReviews();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || "Failed to update review";
+      toast.error(msg);
+    }
+  }
+
+  async function handleDeleteReview(id) {
+    if (!window.confirm("Are you sure you want to delete this review?")) return;
+    try {
+      await axios.delete(`/api/reviews/${id}`, {
+        headers: { Authorization: "Bearer " + token }
+      });
+      toast.success("Review deleted successfully!");
+      fetchReviews();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || "Failed to delete review";
+      toast.error(msg);
+    }
+  }
 
   async function fetchSessions() {
     try {
@@ -364,24 +457,218 @@ export default function StudentDashboard() {
                   </div>
 
                   <div className="flex items-center gap-4 md:border-l border-[#c2c6d4]/20 md:pl-6 md:ml-auto">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${statusBadge(session.status)}`}>
-                      {session.status || "draft"}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${statusBadge(session.status)}`}>
+                        {session.status || "draft"}
+                      </span>
+                      {session.status === "completed" && (() => {
+                        const score = getSessionScore(session);
+                        return score !== null ? (
+                          <span className="text-xs font-bold text-[#00488d]">
+                            Score: {score}/10
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
                     {session.questions?.length > 0 && (
                       <span className="text-xs text-[#424752] hidden md:inline">
                         {session.questions.length} questions
                       </span>
                     )}
-                    <Link
-                      to={`/interview/${session._id}`}
-                      className="w-10 h-10 rounded-full border border-[#c2c6d4]/30 hover:border-[#00488d] hover:bg-[#00488d]/5 hover:text-[#00488d] transition-all flex items-center justify-center shrink-0"
-                    >
-                      <ArrowRightIcon className="w-5 h-5" />
-                    </Link>
+                    {session.status === "completed" ? (
+                      <Link
+                        to={`/report/${session._id}`}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-br from-[#00488d] to-[#006a61] text-white text-xs font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all whitespace-nowrap"
+                      >
+                        View Report
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/interview/${session._id}`}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-br from-[#00488d] to-[#006a61] text-white text-xs font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all whitespace-nowrap"
+                      >
+                        Prepare Interview
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))
             )}
+
+            {/* Reviews Section */}
+            <div className="flex flex-col gap-6 mt-8">
+              <div className="flex items-center justify-between border-t border-[#c2c6d4]/30 pt-6">
+                <h2 className="text-xl font-semibold">Your Reviews</h2>
+              </div>
+
+              {/* Submit Review Form */}
+              <div className="bg-white/70 backdrop-blur-xl border border-black/5 rounded-xl p-6 shadow-sm">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[#727783] mb-4">
+                  Share Your Experience
+                </h3>
+                <form onSubmit={handleSubmitReview} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">Rating</label>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className="p-0.5 hover:scale-110 active:scale-95 transition-all text-[#ffb000] hover:text-[#ff9c00]"
+                        >
+                          {star <= rating ? (
+                            <StarIcon className="w-7 h-7" />
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-7 h-7 text-[#c2c6d4]">
+                              <path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8L2.2 8.9l6.9-.6z" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">Review Message</label>
+                    <textarea
+                      rows={3}
+                      value={reviewText}
+                      onChange={(e) => setReviewText(e.target.value)}
+                      placeholder="Write your review here... How has your AI coach helped you?"
+                      className="w-full bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-4 py-2.5 placeholder:text-[#727783] focus:outline-none focus:ring-2 focus:ring-[#005db5]/20 focus:border-[#00488d] focus:bg-white transition-all text-sm"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-fit px-6 py-2.5 rounded-xl bg-gradient-to-br from-[#00488d] to-[#006a61] text-white text-xs font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all"
+                  >
+                    Submit Review
+                  </button>
+                </form>
+              </div>
+
+              {/* Past Reviews List */}
+              {reviewsLoading ? (
+                <div className="text-sm text-[#424752] text-center py-4">Loading your reviews...</div>
+              ) : reviews.length === 0 ? (
+                <p className="text-sm text-[#424752] italic bg-white/50 border border-black/5 rounded-xl p-4 text-center">
+                  You haven't submitted any reviews yet.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {reviews.map((rev) => (
+                    <div
+                      key={rev._id}
+                      className="bg-white/70 backdrop-blur-xl border border-black/5 rounded-xl p-5 shadow-sm flex flex-col gap-3 transition-all"
+                    >
+                      {editingReviewId === rev._id ? (
+                        /* Edit mode */
+                        <div className="flex flex-col gap-4 w-full">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-[#727783]">Rating</label>
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  onClick={() => setEditRating(star)}
+                                  className="p-0.5 hover:scale-110 active:scale-95 transition-all text-[#ffb000]"
+                                >
+                                  {star <= editRating ? (
+                                    <StarIcon className="w-6 h-6" />
+                                  ) : (
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 text-[#c2c6d4]">
+                                      <path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8L2.2 8.9l6.9-.6z" />
+                                    </svg>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-[#727783]">Message</label>
+                            <textarea
+                              rows={2}
+                              value={editReviewText}
+                              onChange={(e) => setEditReviewText(e.target.value)}
+                              className="w-full bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-4 py-2 placeholder:text-[#727783] focus:outline-none focus:ring-2 focus:ring-[#005db5]/20 focus:border-[#00488d] focus:bg-white transition-all text-sm"
+                              required
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateReview(rev._id)}
+                              className="px-4 py-2 rounded-lg bg-[#006a61] text-white text-xs font-bold hover:opacity-90 active:scale-[0.98] transition-all"
+                            >
+                              Save Changes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingReviewId(null)}
+                              className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-300 active:scale-[0.98] transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Read mode */
+                        <>
+                          <div className="flex justify-between items-start">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex gap-0.5 text-[#ffb000]">
+                                {Array.from({ length: rev.rating }).map((_, i) => (
+                                  <StarIcon key={i} className="w-4.5 h-4.5" />
+                                ))}
+                                {Array.from({ length: 5 - rev.rating }).map((_, i) => (
+                                  <svg key={i} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4.5 h-4.5 text-[#c2c6d4]">
+                                    <path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8L2.2 8.9l6.9-.6z" />
+                                  </svg>
+                                ))}
+                              </div>
+                              <span className="text-[10px] text-[#727783]">
+                                Submitted on {new Date(rev.created_at || rev.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingReviewId(rev._id);
+                                  setEditReviewText(rev.review_text);
+                                  setEditRating(rev.rating);
+                                }}
+                                className="text-xs font-semibold text-[#00488d] hover:underline"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReview(rev._id)}
+                                className="text-xs font-semibold text-[#ba1a1a] hover:underline"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+
+                          <p className="text-sm text-[#0b1c30] leading-relaxed whitespace-pre-wrap">
+                            {rev.review_text}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sidebar content */}
