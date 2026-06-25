@@ -39,33 +39,33 @@ const createSession = async (req, res) => {
             return res.status(401).json({ message: 'Please login first' });
         }
 
-        if (!req.file) {
-            return res.status(400).json({ message: 'Please upload a PDF file.' });
-        }
-
         const questionCount = Math.max(parseInt(req.body.questionCount, 10) || DEFAULT_COUNT, 15);
 
-        const session = new Session({
-            userEmail: user.email,
-            fullName: req.body.fullName || user.fullName,
-            cvFilePath: req.file.path,
-            cvFileName: req.file.originalname,
-            jobRole: req.body.jobRole,
-            preferedIndustry: req.body.preferedIndustry,
-            university: req.body.university,
-            academicYear: req.body.academicYear,
-            experienceLevel: req.body.experienceLevel,
-            areasToFocus: JSON.parse(req.body.areasToFocus || '[]'),
-            questionCount
-        });
+    const session = new Session({
+        userEmail: user.email,
+        fullName: req.body.fullName || user.fullName,
+        cvFilePath: req.file.path,
+        cvFileName: req.file.originalname,
+        jobRole: req.body.jobRole,
+        preferedIndustry: req.body.preferedIndustry,
+        university: req.body.university,
+        academicYear: req.body.academicYear,
+        experienceLevel: req.body.experienceLevel,
+        areasToFocus: JSON.parse(req.body.areasToFocus || '[]'),
+        questionCount
+    });
 
-        await session.save();
-
-        res.json({
-            message: 'CV uploaded and session created successfully',
-            sessionId: session._id,
-            cvFilePath: req.file.path,
-            questionCount: session.questionCount
+    session.save()
+        .then(() => {
+            res.json({
+                message: 'CV uploaded and session created successfully',
+                sessionId: session._id,
+                cvFilePath: req.file.path,
+                questionCount: session.questionCount
+            });
+        })
+        .catch((error) => {
+            res.status(500).json({ message: 'Error creating session', error: error.message });
         });
     } catch (error) {
         res.status(500).json({ message: 'Error creating session', error: error.message });

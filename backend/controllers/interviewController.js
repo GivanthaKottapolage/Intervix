@@ -7,6 +7,13 @@ const {
 } = require('../services/interviewFlowService');
 const { generateFeedbackReport } = require('../services/geminiService');
 
+// const formatError = (err) => {
+//     const msg = err?.message || 'Unknown error';
+//     if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
+//         return 'Gemini quota exceeded. Wait a few minutes and try again.';
+//     }
+//     return msg.slice(0, 300);
+// };
 const formatError = (err) => {
     console.error(err);
     return err?.message || 'Unknown error';
@@ -41,7 +48,7 @@ const prepareInterview = async (req, res) => {
             });
         }
 
-        const count = parseInt(questionCount, 10) || session.questionCount || DEFAULT_COUNT;
+        const count = Math.max(parseInt(questionCount, 10) || session.questionCount || DEFAULT_COUNT, 15);
         session.questionCount = count;
         session.processingError = null;
         await session.save();
