@@ -118,15 +118,15 @@ const generateInterviewQuestions = async (cvData, sessionMeta = {}, questionCoun
     }
 
     const prompt = `Generate exactly ${count} interview questions for a ${sessionMeta.jobRole || 'Software Engineer'} candidate at the ${experienceLevel} level. ${levelInstructions}
-
+ 
 Candidate CV:
 ${cvString}
-
+ 
 IMPORTANT:
-Candidate Experience Level: ${normalizedLevel}
-
+Candidate Experience Level: ${experienceLevel}
+ 
 The interview structure, question complexity, and topics MUST adapt to the candidate's experience level.
-
+ 
 Do NOT ask senior-level architecture questions to interns.
 Do NOT ask beginner-level questions to senior candidates.
 
@@ -238,32 +238,116 @@ Return ONLY a valid JSON array (no markdown, no extra text):
 };
 
 /**
- * Feature 6 — Evaluate one answer with structured JSON feedback.
+ * Feature 6 — Evaluate one answer with strict interview scoring.
  */
 const evaluateAnswer = async (question, answerText, cvData) => {
-    const prompt = `Evaluate this interview answer.
 
-Question: ${question}
-User Answer: ${answerText}
-CV Summary: ${cvData?.summary || JSON.stringify(cvData || {}).slice(0, 500)}
+    const prompt = `
+You are a strict professional technical interviewer.
 
-Return ONLY valid JSON:
+Your task is to evaluate the candidate's interview answer.
+
+Interview Question:
+${question}
+
+Candidate Answer:
+${answerText}
+
+Candidate CV Information:
+${JSON.stringify(cvData || {}).slice(0, 1200)}
+
+
+Evaluation Guidelines:
+
+You must judge the answer like a real software engineering interviewer.
+
+Scoring criteria:
+
+0 - 2:
+- Completely wrong answer
+- No understanding
+- Answer unrelated to question
+
+3 - 4:
+- Very limited understanding
+- Contains some related keywords but explanation is incorrect or incomplete
+
+5 - 6:
+- Basic understanding
+- Correct idea but missing technical details, examples, or practical usage
+
+7 - 8:
+- Good understanding
+- Correct explanation
+- Includes examples or practical experience
+
+9 - 10:
+- Excellent answer
+- Deep technical understanding
+- Clear explanation
+- Real-world examples
+- Shows professional experience
+
+
+IMPORTANT RULES:
+
+1. Do NOT give high marks only because keywords are present.
+2. A short one-line answer should NOT receive more than 5/10 unless the question requires a short answer.
+3. Wrong technical information must reduce the score.
+4. If the candidate only repeats a definition without explanation, reduce the score.
+5. Compare the answer with industry interview standards.
+6. Check technical correctness, completeness, and practical understanding.
+7. Be strict but fair.
+
+
+Return ONLY valid JSON.
+
+Format:
+
 {
   "correct": true,
-  "score": 8,
-  "feedback": "Good explanation but add more technical details",
-  "improvement": "Explain your architecture clearly"
+  "score": 0,
+  "technical_accuracy": 0,
+  "completeness": 0,
+  "communication": 0,
+  "feedback": "",
+  "improvement": ""
 }
 
-Score 0-10. "correct" is true if score >= 6.`;
+
+Rules:
+- correct = true only if score >= 7
+- score must be between 0 and 10
+- technical_accuracy, completeness, communication must be between 0 and 10
+
+`;
 
     return withGeminiRetry(async (model) => {
-        const evaluation = parseJsonFromGemini(await generateText(model, prompt));
-        console.log(`[Gemini] Evaluation score: ${evaluation.score} | correct: ${evaluation.correct}`);
+
+        const response = await generateText(model, prompt);
+
+        const evaluation = parseJsonFromGemini(response);
+
+
+        // Safety validation
+        evaluation.score = Math.min(
+            10,
+            Math.max(0, Number(evaluation.score) || 0)
+        );
+
+
+        evaluation.correct = evaluation.score >= 7;
+
+
+        console.log(
+            `[Gemini Evaluation] Score: ${evaluation.score}/10 | Correct: ${evaluation.correct}`
+        );
+
+
         return evaluation;
+
     }, 'evaluate_answer');
 };
-
 /**
  * Called during interview — generates the next question dynamically
  * using the conversation transcript and CV.

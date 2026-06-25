@@ -168,6 +168,7 @@ export default function InterviewSession() {
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
+  const [startAttempted, setStartAttempted] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -208,6 +209,15 @@ export default function InterviewSession() {
       navigate("/dashboard");
     });
   }, [token, navigate, loadSession]);
+
+  useEffect(() => {
+    if (step === STEPS.PREPARE && !busy && session && !session.processingError) {
+      handlePrepare();
+    } else if (step === STEPS.READY && !busy && session && !startAttempted) {
+      setStartAttempted(true);
+      handleStartInterview();
+    }
+  }, [step, busy, session, startAttempted]);
 
   const playQuestionTts = useCallback(
     async (index) => {
@@ -423,58 +433,66 @@ export default function InterviewSession() {
 
           {/* PREPARE */}
           {step === STEPS.PREPARE && (
-            <div className="flex flex-col gap-5">
-              <p className="text-[#424752]">Prepare your AI interview from your uploaded CV.</p>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Number of questions</label>
-                <div className="bg-[#eff4ff] border border-[#c2c6d4]/50 rounded-lg px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-[#424752]">3</span>
-                    <span className="text-lg font-bold text-[#00488d]">{questionCount}</span>
-                    <span className="text-xs text-[#424752]">15</span>
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-6">
+              {!session.processingError ? (
+                <>
+                  <Spinner className="w-10 h-10 text-[#00488d]" />
+                  <div>
+                    <h3 className="text-lg font-bold mb-2">Analyzing your CV</h3>
+                    <p className="text-sm text-[#424752] max-w-md">
+                      We are generating customized mock interview questions tailored to your experience level and target role. This will take a moment...
+                    </p>
                   </div>
-                  <input
-                    type="range"
-                    min={3}
-                    max={15}
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="w-full accent-[#00488d]"
-                  />
+                </>
+              ) : (
+                <div className="w-full">
+                  <h3 className="text-lg font-bold mb-2 text-[#ba1a1a]">Preparation Failed</h3>
+                  <p className="text-sm text-[#ba1a1a] bg-red-50 p-4 rounded-xl max-w-md mx-auto mb-4 border border-red-200">
+                    {session.processingError}
+                  </p>
+                  <button
+                    onClick={handlePrepare}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-br from-[#00488d] to-[#006a61] text-white text-sm font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all"
+                  >
+                    Retry Preparation
+                  </button>
                 </div>
-              </div>
-
-              {session.processingError && (
-                <p className="text-sm text-[#ba1a1a] bg-red-50 p-3 rounded-lg">{session.processingError}</p>
               )}
-
-              <button
-                onClick={handlePrepare}
-                disabled={busy}
-                className="w-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)] disabled:opacity-60"
-              >
-                {busy && <Spinner className="w-4 h-4" />}
-                {busy ? "Generating questions…" : "Prepare Interview"}
-              </button>
             </div>
           )}
 
           {/* READY */}
           {step === STEPS.READY && (
-            <div className="flex flex-col items-center text-center gap-5 py-2">
-              <div className="w-14 h-14 rounded-full bg-[#86f2e4]/60 flex items-center justify-center">
-                <CheckCircleIcon className="w-7 h-7 text-[#006a61]" />
-              </div>
-              <p className="text-[#006a61] font-semibold">{total} questions ready</p>
-              <button
-                onClick={handleStartInterview}
-                disabled={busy}
-                className="w-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)] disabled:opacity-60"
-              >
-                {busy && <Spinner className="w-4 h-4" />}
-                {busy ? "Starting…" : "Start Interview"}
-              </button>
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-6">
+              {busy ? (
+                <>
+                  <Spinner className="w-10 h-10 text-[#00488d]" />
+                  <div>
+                    <h3 className="text-lg font-bold mb-2">Starting Mock Interview</h3>
+                    <p className="text-sm text-[#424752] max-w-md">
+                      Your personalized questions have been generated successfully. Setting up the interviewer and audio assets...
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-14 h-14 rounded-full bg-[#86f2e4]/60 flex items-center justify-center">
+                    <CheckCircleIcon className="w-7 h-7 text-[#006a61]" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold mb-2">Interview Ready</h3>
+                    <p className="text-sm text-[#006a61] font-semibold mb-4">{total} questions generated successfully</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setStartAttempted(false); // Reset to allow retry
+                    }}
+                    className="w-full bg-gradient-to-br from-[#00488d] to-[#006a61] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_14px_0_rgba(0,72,141,0.3)]"
+                  >
+                    Start Interview
+                  </button>
+                </>
+              )}
             </div>
           )}
 

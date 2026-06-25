@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function StarIcon({ className = "" }) {
   return (
@@ -93,11 +94,11 @@ function Stars({ count = 5 }) {
   );
 }
 
-function ReviewCard({ quote, name, role, initials }) {
+function ReviewCard({ quote, name, role, initials, rating = 5 }) {
   return (
     <div className="bg-white/70 backdrop-blur-md border border-white/50 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
       <div>
-        <Stars />
+        <Stars count={rating} />
         <p className="mt-4 mb-6 text-[#111c2d] text-[15px] leading-relaxed italic">&ldquo;{quote}&rdquo;</p>
       </div>
       <div className="flex items-center gap-3 border-t border-[#bfc8cb]/30 pt-4">
@@ -148,11 +149,53 @@ function StatCard({ label, value, sub }) {
   );
 }
 
+const defaultReviews = [
+  {
+    review_id: "default-1",
+    quote: "Intervix transformed how I talk about my achievements. I felt like I had a secret weapon during my final interview at a Fortune 500 company.",
+    name: "James Dalton",
+    role: "Senior Product Manager",
+    initials: "JD",
+    rating: 5
+  },
+  {
+    review_id: "default-2",
+    quote: "The real-time speech analysis caught filler words I didn't even know I was using. Within a week, my confidence score jumped by 40%.",
+    name: "Sarah Mitchell",
+    role: "Data Scientist",
+    initials: "SM",
+    rating: 5
+  },
+  {
+    review_id: "default-3",
+    quote: "I landed my dream role as a Creative Director. The specific feedback on my CV-based questions was incredibly accurate to the actual interview.",
+    name: "Alex Lee",
+    role: "Creative Director",
+    initials: "AL",
+    rating: 5
+  }
+];
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const sectionsRef = useRef([]);
+  const [reviews, setReviews] = useState(defaultReviews);
 
   const goToLogin = () => navigate("/login");
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const res = await axios.get("/api/reviews/public");
+        if (res.data && res.data.length > 0) {
+          setReviews(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch public reviews, using defaults:", err);
+      }
+    };
+    fetchReviews();
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -330,24 +373,16 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <ReviewCard
-              quote="Intervix transformed how I talk about my achievements. I felt like I had a secret weapon during my final interview at a Fortune 500 company."
-              name="James Dalton"
-              role="Senior Product Manager"
-              initials="JD"
-            />
-            <ReviewCard
-              quote="The real-time speech analysis caught filler words I didn't even know I was using. Within a week, my confidence score jumped by 40%."
-              name="Sarah Mitchell"
-              role="Data Scientist"
-              initials="SM"
-            />
-            <ReviewCard
-              quote="I landed my dream role as a Creative Director. The specific feedback on my CV-based questions was incredibly accurate to the actual interview."
-              name="Alex Lee"
-              role="Creative Director"
-              initials="AL"
-            />
+            {reviews.map((r) => (
+              <ReviewCard
+                key={r.review_id}
+                quote={r.quote}
+                name={r.name}
+                role={r.role}
+                initials={r.initials}
+                rating={r.rating}
+              />
+            ))}
           </div>
         </section>
 

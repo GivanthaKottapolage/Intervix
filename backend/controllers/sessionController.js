@@ -39,33 +39,41 @@ const createSession = async (req, res) => {
             return res.status(401).json({ message: 'Please login first' });
         }
 
+        if (!req.file) {
+            return res.status(400).json({ message: 'CV file is required' });
+        }
+
         const questionCount = Math.max(parseInt(req.body.questionCount, 10) || DEFAULT_COUNT, 15);
 
-    const session = new Session({
-        userEmail: user.email,
-        fullName: req.body.fullName || user.fullName,
-        cvFilePath: req.file.path,
-        cvFileName: req.file.originalname,
-        jobRole: req.body.jobRole,
-        preferedIndustry: req.body.preferedIndustry,
-        university: req.body.university,
-        academicYear: req.body.academicYear,
-        experienceLevel: req.body.experienceLevel,
-        areasToFocus: JSON.parse(req.body.areasToFocus || '[]'),
-        questionCount
-    });
+        // Upload CV file to Supabase storage
+        let publicUrl;
+        try {
+            publicUrl = await uploadFile(req.file.buffer, req.file.originalname);
+        } catch (uploadError) {
+            return res.status(500).json({ message: 'Failed to upload CV to storage', error: uploadError.message });
+        }
 
-    session.save()
-        .then(() => {
-            res.json({
-                message: 'CV uploaded and session created successfully',
-                sessionId: session._id,
-                cvFilePath: req.file.path,
-                questionCount: session.questionCount
-            });
-        })
-        .catch((error) => {
-            res.status(500).json({ message: 'Error creating session', error: error.message });
+        const session = new Session({
+            userEmail: user.email,
+            fullName: req.body.fullName || user.fullName,
+            cvFilePath: publicUrl,
+            cvFileName: req.file.originalname,
+            jobRole: req.body.jobRole,
+            preferedIndustry: req.body.preferedIndustry,
+            university: req.body.university,
+            academicYear: req.body.academicYear,
+            experienceLevel: req.body.experienceLevel,
+            areasToFocus: JSON.parse(req.body.areasToFocus || '[]'),
+            questionCount
+        });
+
+        await session.save();
+
+        res.json({
+            message: 'CV uploaded and session created successfully',
+            sessionId: session._id,
+            cvFilePath: publicUrl,
+            questionCount: session.questionCount
         });
     } catch (error) {
         res.status(500).json({ message: 'Error creating session', error: error.message });

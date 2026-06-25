@@ -6,6 +6,7 @@ const cors = require("cors")
 const dotenv = require("dotenv")
 const sessionRouter = require("./routes/sessionRouter.js")
 const aiRouter = require("./routes/aiRouter.js")
+const reviewRouter = require("./routes/reviewRouter.js")
 const dns = require("dns")
 
 
@@ -49,6 +50,7 @@ app.use((req, res, next) => {
 
 app.use("/api/users", userRouter)
 app.use("/api/sessions", sessionRouter)
+app.use("/api/reviews", reviewRouter)
 app.use("/api", aiRouter)
 
 

@@ -48,6 +48,7 @@ export default function AuthPage() {
       const res = await axios.post('/api/users/login', { email, password })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('role', res.data.role)
+      localStorage.setItem('userId', res.data.userId)
       navigate(res.data.role === 'admin' ? '/admin-dashboard' : '/dashboard')
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed')
