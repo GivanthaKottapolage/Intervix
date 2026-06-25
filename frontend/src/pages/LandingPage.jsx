@@ -322,16 +322,7 @@ export default function LandingPage() {
                 className="w-full h-auto object-cover transform transition-transform duration-700 group-hover:scale-[1.03]"
               />
             </div>
-            <div className="absolute -bottom-5 -left-5 bg-white/80 backdrop-blur-md border border-white/60 rounded-xl p-4 shadow-lg hidden md:flex items-center gap-3 animate-bounce"
-              style={{ animationDuration: "3s" }}>
-              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00434f,#0d5c6b)" }}>
-                <CheckIcon className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-[#3f484b]">Real-time Analysis</p>
-                <p className="text-sm font-bold text-[#00434f]">Feedback Ready</p>
-              </div>
-            </div>
+
           </div>
         </section>
 
