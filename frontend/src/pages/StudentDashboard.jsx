@@ -137,6 +137,17 @@ function statusBadge(status) {
   }
 }
 
+function getSessionScore(session) {
+  if (session.report && typeof session.report.overall_score === 'number') {
+    return session.report.overall_score;
+  }
+  if (session.answers && session.answers.length > 0) {
+    const sum = session.answers.reduce((acc, curr) => acc + (curr.evaluation?.score || 0), 0);
+    return Number((sum / session.answers.length).toFixed(1));
+  }
+  return null;
+}
+
 export default function StudentDashboard() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -364,20 +375,39 @@ export default function StudentDashboard() {
                   </div>
 
                   <div className="flex items-center gap-4 md:border-l border-[#c2c6d4]/20 md:pl-6 md:ml-auto">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${statusBadge(session.status)}`}>
-                      {session.status || "draft"}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${statusBadge(session.status)}`}>
+                        {session.status || "draft"}
+                      </span>
+                      {session.status === "completed" && (() => {
+                        const score = getSessionScore(session);
+                        return score !== null ? (
+                          <span className="text-xs font-bold text-[#00488d]">
+                            Score: {score}/10
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
                     {session.questions?.length > 0 && (
                       <span className="text-xs text-[#424752] hidden md:inline">
                         {session.questions.length} questions
                       </span>
                     )}
-                    <Link
-                      to={`/interview/${session._id}`}
-                      className="w-10 h-10 rounded-full border border-[#c2c6d4]/30 hover:border-[#00488d] hover:bg-[#00488d]/5 hover:text-[#00488d] transition-all flex items-center justify-center shrink-0"
-                    >
-                      <ArrowRightIcon className="w-5 h-5" />
-                    </Link>
+                    {session.status === "completed" ? (
+                      <Link
+                        to={`/report/${session._id}`}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-br from-[#00488d] to-[#006a61] text-white text-xs font-bold shadow-md hover:opacity-90 active:scale-[0.98] transition-all whitespace-nowrap"
+                      >
+                        View Report
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/interview/${session._id}`}
+                        className="w-10 h-10 rounded-full border border-[#c2c6d4]/30 hover:border-[#00488d] hover:bg-[#00488d]/5 hover:text-[#00488d] transition-all flex items-center justify-center shrink-0"
+                      >
+                        <ArrowRightIcon className="w-5 h-5" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))
